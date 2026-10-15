@@ -62,7 +62,8 @@ systemctl reload nginx
 echo
 echo "=== 7) 状态 ==="
 sleep 3
-systemctl is-active daily-brief-web.service daily-brief-scheduler.service
+systemctl is-active daily-brief-web.service || true
+systemctl is-active daily-brief-scheduler.service || true
 ss -tlnp | grep 8848 || true
 echo
 echo "安装完成。"
