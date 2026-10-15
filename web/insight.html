@@ -251,26 +251,50 @@
   const trigBtn = $('#btn-trigger-ai');
   if (trigBtn) trigBtn.addEventListener('click', async () => {
     const st = $('#ai-trigger-status');
-    trigBtn.disabled = true; st.textContent = '触发中…';
+    trigBtn.disabled = true; st.textContent = '已提交，后台执行中…';
     try {
       const r = await fetch('/api/ai/trigger', { method: 'POST' });
-      const d = await r.json();
-      st.textContent = `快讯解读 ${d.brief.done} 条 · 复盘 ${d.review.ok ? '已生成' : d.review.skipped ? '未到盘后' : '失败'}`;
-      refreshSentiment();
-    } catch (e) { st.textContent = '触发失败：' + e.message; }
-    trigBtn.disabled = false;
+      await r.json();
+      // 轮询任务进度
+      const poll = setInterval(async () => {
+        try {
+          const tr = await fetch('/api/ai/task');
+          const td = await tr.json();
+          if (td.state === 'running') {
+            st.textContent = `执行中… 已解读 ${td.brief_done || 0} 条快讯`;
+          } else if (td.state === 'done') {
+            st.textContent = `完成：解读 ${td.brief_done} 条${td.review && td.review.ok ? ' · 复盘已生成' : ''}`;
+            clearInterval(poll); trigBtn.disabled = false;
+            refreshSentiment();
+            if (td.review && td.review.ok) loadReview($('#review-date').value);
+          } else if (td.state === 'error') {
+            st.textContent = '执行出错，请查看日志';
+            clearInterval(poll); trigBtn.disabled = false;
+          }
+        } catch (e) { /* 轮询中忽略 */ }
+      }, 4000);
+    } catch (e) { st.textContent = '提交失败：' + e.message; trigBtn.disabled = false; }
   });
   const regenBtn = $('#btn-regen-review');
   if (regenBtn) regenBtn.addEventListener('click', async () => {
     const st = $('#ai-trigger-status');
-    regenBtn.disabled = true; st.textContent = '重新生成中（约 30–60 秒）…';
+    regenBtn.disabled = true; st.textContent = '已提交，后台生成中…';
     try {
-      const r = await fetch('/api/daily-review?regenerate=1');
-      const d = await r.json();
-      if (d.content) $('#review-body').innerHTML = markedLite(d.content);
-      st.textContent = '已生成';
-    } catch (e) { st.textContent = '失败：' + e.message; }
-    regenBtn.disabled = false;
+      await fetch('/api/daily-review?regenerate=1');
+      const poll = setInterval(async () => {
+        try {
+          const tr = await fetch('/api/daily-review?date=' + encodeURIComponent($('#review-date').value));
+          const td = await tr.json();
+          if (td.cached && td.content) {
+            $('#review-body').innerHTML = markedLite(td.content);
+            st.textContent = '复盘已生成';
+            clearInterval(poll); regenBtn.disabled = false;
+          } else {
+            st.textContent = '生成中…';
+          }
+        } catch (e) { /* 轮询中忽略 */ }
+      }, 5000);
+    } catch (e) { st.textContent = '提交失败：' + e.message; regenBtn.disabled = false; }
   });
 
   // 初始化

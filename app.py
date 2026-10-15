@@ -682,22 +682,29 @@ def api_sentiment(hours: int = Query(24, ge=1, le=720)):
 
 @app.get("/api/daily-review")
 def api_daily_review(request: Request, date: str = Query(""), regenerate: int = Query(0)):
-    """读取/生成每日复盘。regenerate=1 且为 admin 时强制重算。"""
+    """读取/生成每日复盘。regenerate=1 且为 admin 时后台重算。"""
     user = current_user(request)
     if not ai:
         raise HTTPException(503, "AI 模块不可用")
     if regenerate == 1:
         if not (is_vip(user) and user["role"] == "admin"):
             raise HTTPException(403, "仅管理员可强制重算")
+        import threading
+
         date = date or now_cst().strftime("%Y-%m-%d")
-        try:
-            db.save_ai_report("daily_review", date, "")  # 先清缓存避免复用
-            return JSONResponse(ai.daily_review(date))
-        except Exception as e:  # noqa: BLE001
-            raise HTTPException(502, f"复盘生成失败: {e}") from e
+
+        def _run():
+            try:
+                db.save_ai_report("daily_review", date, "")  # 清缓存
+                ai.daily_review(date)
+            except Exception as e:  # noqa: BLE001
+                db.log_ai_usage("daily_review", "error", message=str(e))
+
+        threading.Thread(target=_run, daemon=True).start()
+        return JSONResponse({"accepted": True, "date": date, "state": "running"})
     date = date or now_cst().strftime("%Y-%m-%d")
     cached = db.get_ai_report("daily_review", date)
-    if not cached:
+    if not cached or not cached["content"]:
         return JSONResponse({"cached": False, "content": "", "date": date, "pending": True})
     return JSONResponse({"cached": True, "content": cached["content"], "date": date,
                          "model": cached["model"], "created_at": cached["created_at"]})
@@ -726,14 +733,52 @@ def api_stock_ai_query(request: Request, code: str = Query(...), force: int = Qu
 
 @app.post("/api/ai/trigger")
 def api_ai_trigger(request: Request):
-    """管理员手动触发：快讯批量解读 + 盘后复盘。"""
+    """管理员手动触发：快讯批量解读 + 盘后复盘（后台执行，避免长连接超时）。"""
     user = current_user(request)
     if not (is_vip(user) and user["role"] == "admin"):
         raise HTTPException(403, "仅管理员可触发")
     if not ai:
         raise HTTPException(503, "AI 模块不可用")
-    out = {"brief": ai.classify_pending(limit=20), "review": ai.generate_daily_review_if_due()}
-    return JSONResponse(out)
+    import threading
+
+    task = {"state": "running", "brief_done": 0, "brief_errors": [], "review": None,
+            "started_at": fmt_cst(), "finished_at": ""}
+    db.save_ai_report("ai_task", "manual", json.dumps(task, ensure_ascii=False))
+    task_ref = db.get_ai_report("ai_task", "manual")
+
+    def _run():
+        try:
+            out = ai.classify_pending(limit=20)
+            task["brief_done"] = out.get("done", 0)
+            task["brief_errors"] = out.get("errors", [])
+            try:
+                task["review"] = ai.generate_daily_review_if_due()
+            except Exception as e:  # noqa: BLE001
+                task["review"] = {"ok": False, "error": str(e)}
+            task["state"] = "done"
+        except Exception as e:  # noqa: BLE001
+            task["state"] = "error"
+            task["brief_errors"].append(str(e))
+        task["finished_at"] = fmt_cst()
+        db.save_ai_report("ai_task", "manual", json.dumps(task, ensure_ascii=False))
+
+    threading.Thread(target=_run, daemon=True).start()
+    return JSONResponse({"accepted": True, "state": "running"})
+
+
+@app.get("/api/ai/task")
+def api_ai_task(request: Request):
+    """查询后台 AI 任务进度。"""
+    user = current_user(request)
+    if not user:
+        raise HTTPException(401, "请先登录")
+    row = db.get_ai_report("ai_task", "manual")
+    if not row:
+        return JSONResponse({"state": "idle"})
+    try:
+        return JSONResponse(json.loads(row["content"]))
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"state": "unknown"})
 
 
 @app.get("/api/ai/brief/{brief_id}")
