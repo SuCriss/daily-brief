@@ -8,9 +8,38 @@
 浏览器 ──HTTPS──> Cloudflare ──> nginx :443 ──> 127.0.0.1:8848（uvicorn/FastAPI）
                                                     ↑
                                           scheduler.py 常驻采集（热搜 2min / 快讯 1min）
+                                                    ↑
+                                AI 层 ai.py ──> http://127.0.0.1:3065/v1（agent2api 内网直连）
 ```
 
 应用只监听 `127.0.0.1:8848`，不直接对外暴露；对外仅经 nginx 443。
+AI 分析层走服务器内网 `127.0.0.1:3065` 直连 agent2api 网关（248 个模型），绕开 Cloudflare WAF。
+
+## AI 智能分析层
+
+部署后站点新增 `/insight`（AI 洞察）页面与 6 个 AI 接口：
+
+| 能力 | 接口 | 说明 |
+|---|---|---|
+| 快讯情绪解读 | 调度器自动 / `POST /api/ai/trigger` | 利好/利空/中性 + 影响度 + 题材 + 一句话解读，缓存进 `ai_reports` |
+| 情绪统计 | `GET /api/sentiment` | 24h 情绪分布 / 多空指数 / 分时 |
+| 每日复盘 | `GET /api/daily-review` | 盘后 15:30 后自动生成 Markdown 复盘 |
+| 个股分析 | `GET /api/ai/stock/{code}` | K线技术面 + 消息面，缓存 24h |
+| 任务进度 | `GET /api/ai/task` | 后台 AI 任务状态轮询 |
+| 实时流 | `GET /api/stream` | SSE 新快讯 + AI 解读推送 |
+
+**密钥不在版本库**，经 `/opt/daily-brief/data/ai.env`（权限 600）注入 systemd：
+
+```bash
+# /opt/daily-brief/data/ai.env
+AI_API_KEY=sk-a2a-xxx
+```
+
+systemd 用 `EnvironmentFile=-/opt/daily-brief/data/ai.env` 读取；首次部署 `install.sh` 会生成空模板，
+需手工填入 `AI_API_KEY` 后 `systemctl restart daily-brief-web daily-brief-scheduler`。
+
+> **Cloudflare 100s 网关超时**：批量 AI 触发（20 条解读 + 复盘）耗时 3–5 分钟，远超 CF 网关 100s，
+> 因此 `/api/ai/trigger` 与复盘重算都改成**后台线程 + 轮询**，接口立即返回。
 
 ## 一键部署
 
@@ -22,11 +51,11 @@ bash /opt/daily-brief/deploy/install.sh
 脚本幂等，可重复执行用于更新。它依次完成：
 
 1. clone / `git fetch && git reset --hard origin/main`
-2. `mkdir -p /opt/daily-brief/data`
+2. `mkdir -p /opt/daily-brief/data` + 生成/锁定 `ai.env`
 3. 建 venv 并 `pip install -r requirements.txt`
 4. 初始化 SQLite（`DAILY_BRIEF_DB=/opt/daily-brief/data/brief.db`）并加载股票/板块字典
 5. 安装 `daily-brief-web.service` + `daily-brief-scheduler.service` 并 enable --now
-6. 写入 `/etc/nginx/conf.d/a-stock.chrisite.eu.cc.conf` 并 `nginx -t && systemctl reload nginx`
+6. 写入 `/etc/nginx/conf.d/a-stock.chrisite.eu.cc.conf`（含 `/api/stream` SSE 关缓冲）并 reload
 
 ## 服务器路径
 

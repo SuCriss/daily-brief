@@ -87,7 +87,8 @@ def fetch_weibo_hot() -> list[dict]:
 
 
 def fetch_baidu_hot() -> list[dict]:
-    r = _get("https://top.baidu.com/api/board?platform=wise&tab=realtime")
+    # 百度对海外 IP 偶发限流/超时，缩短单次超时避免拖慢调度轮次
+    r = _get("https://top.baidu.com/api/board?platform=wise&tab=realtime", timeout=8)
     # 百度该接口返回 UTF-8，但 requests 有时按 ISO-8859-1 猜编码
     r.encoding = "utf-8"
     data = r.json()
