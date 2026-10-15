@@ -20,6 +20,11 @@ import extract
 import sources
 from db import fmt_cst
 
+try:  # AI 层为可选增强：导入失败不影响采集主链路
+    import ai
+except Exception:  # noqa: BLE001
+    ai = None  # type: ignore[assignment]
+
 HOT_INTERVAL = int(os.environ.get("HOT_INTERVAL", "120"))      # 热搜 2 分钟
 NEWS_INTERVAL = int(os.environ.get("NEWS_INTERVAL", "60"))     # 快讯 1 分钟
 EXTRACT_EVERY = int(os.environ.get("EXTRACT_EVERY", "3"))      # 每 3 轮做一次抽取
@@ -36,7 +41,13 @@ def _stop(signum, frame):  # noqa: ARG001
 def cycle_once(do_extract: bool = True) -> dict:
     report = sources.run_all()
     ex = extract.run_extraction() if do_extract else {"scanned": 0, "mentions": 0}
-    return {"report": report, "extract": ex, "stats": db.stats()}
+    ai_rep = {"skipped": True, "reason": "disabled"}
+    if ai.ai_available() and do_extract:
+        try:
+            ai_rep = ai.classify_pending()
+        except Exception as e:  # noqa: BLE001
+            ai_rep = {"ok": False, "error": str(e)}
+    return {"report": report, "extract": ex, "ai": ai_rep, "stats": db.stats()}
 
 
 def _install_signal_handlers() -> None:
@@ -88,10 +99,22 @@ def main() -> None:
             else:
                 ex = {"scanned": 0, "mentions": 0}
 
+            ai_rep = {"skipped": True, "reason": "disabled"}
+            if ai is not None and ai.ai_available():
+                try:
+                    ai_rep = ai.classify_pending()
+                except Exception as e:  # noqa: BLE001
+                    ai_rep = {"ok": False, "error": str(e)}
+                try:
+                    ai.generate_daily_review_if_due()
+                except Exception as e:  # noqa: BLE001
+                    db.log_fetch("daily_review", "error", 0, str(e))
+
             st = db.stats()
             print(
                 f"[{fmt_cst()}] round={round_no} brief={st['brief_items']} "
-                f"mentions={st['mentions']} extract={ex['scanned']} err={len(report['errors'])}",
+                f"mentions={st['mentions']} extract={ex['scanned']} "
+                f"ai_done={ai_rep.get('done', 0)} err={len(report['errors'])}",
                 flush=True,
             )
         except Exception as e:  # noqa: BLE001

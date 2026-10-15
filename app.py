@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 from datetime import timedelta
 from typing import Optional
@@ -29,6 +30,11 @@ import kline
 import sources
 from db import CST, fmt_cst, get_conn, now_cst, tx
 
+try:  # AI 层为可选增强
+    import ai
+except Exception as _ai_import_err:  # noqa: BLE001
+    ai = None  # type: ignore[assignment]
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FREE_DELAY_HOURS = 3  # 访客可见延迟，对应目标站"当前只能查看3小时前信息"
 # 是否对访客隐藏会员专属页（每日快讯/股票统计/板块统计/自定义监控），
@@ -38,6 +44,37 @@ GATE_ENABLED = os.environ.get("GATE_ENABLED", "1") not in ("0", "false", "False"
 app = FastAPI(title="每日快讯", docs_url=None, redoc_url=None)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "web"))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "web")), name="static")
+
+
+# --------------------------------------------------------------------------
+# 轻量 Markdown 渲染（供 AI 复盘/个股分析使用，避免额外依赖）
+# --------------------------------------------------------------------------
+def md_to_html(text: str) -> str:
+    import html as _html
+
+    esc = _html.escape(text or "")
+    out = []
+    for line in esc.splitlines():
+        s = line.rstrip()
+        if not s.strip():
+            out.append("")
+            continue
+        if s.startswith("### "):
+            out.append(f"<h4 class='md-h4'>{s[4:]}</h4>")
+        elif s.startswith("## "):
+            out.append(f"<h3 class='md-h3'>{s[3:]}</h3>")
+        elif s.startswith("# "):
+            out.append(f"<h2 class='md-h2'>{s[2:]}</h2>")
+        elif s.startswith("- "):
+            out.append(f"<li class='md-li'>{s[2:]}</li>")
+        elif re.match(r"^\d+\.\s", s):
+            out.append(f"<li class='md-li'>{re.sub(r'^\\d+\\.\\s','',s)}</li>")
+        else:
+            out.append(f"<p class='md-p'>{s}</p>")
+    return "\n".join(out)
+
+
+templates.env.globals["md_to_html"] = md_to_html
 
 
 # --------------------------------------------------------------------------
@@ -120,6 +157,7 @@ def ctx(request: Request, user: Optional[dict], **kw) -> dict:
         "is_vip": is_vip(user),
         "free_delay_hours": FREE_DELAY_HOURS,
         "stats": db.stats(),
+        "today": now_cst().strftime("%Y-%m-%d"),
         **kw,
     }
 
@@ -583,6 +621,186 @@ def img_proxy(u: str = Query(..., max_length=2048)):
 @app.get("/healthz")
 def healthz():
     return JSONResponse({"ok": True, "time": fmt_cst(), "stats": db.stats()})
+
+
+# --------------------------------------------------------------------------
+# AI 智能分析层
+# --------------------------------------------------------------------------
+AI_ROUTES_ENABLED = ai is not None
+
+
+def ai_status() -> dict:
+    """AI 网关与启用状态（隐藏密钥）。"""
+    return {
+        "enabled": ai.ai_available() if ai else False,
+        "model": ai.AI_MODEL if ai else "",
+        "base_url": (ai.AI_BASE_URL if ai else ""),
+        "import_ok": AI_ROUTES_ENABLED,
+    }
+
+
+@app.get("/insight", response_class=HTMLResponse)
+def page_insight(request: Request):
+    """AI 智能分析面板。会员/登录用户可看，访客走门禁。"""
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login?next=/insight", status_code=302)
+    senti = ai.sentiment_stats(24) if ai else {}
+    return templates.TemplateResponse(
+        request,
+        "insight.html",
+        ctx(request, user, senti=senti, ai_status=ai_status(), active="insight"),
+    )
+
+
+@app.get("/api/insight")
+def api_insight(request: Request, date: str = ""):
+    """AI 分析面板数据聚合：情绪统计 + 最新复盘 + AI 状态。"""
+    user = current_user(request)
+    if not user:
+        raise HTTPException(401, "请先登录")
+    if not ai:
+        raise HTTPException(503, "AI 模块不可用")
+    senti = ai.sentiment_stats(24)
+    review = {"cached": False, "content": "", "date": date}
+    if date:
+        review = ai.daily_review(date)
+    else:
+        latest = db.get_ai_report("daily_review", now_cst().strftime("%Y-%m-%d"))
+        if latest:
+            review = {"cached": True, "content": latest["content"], "date": now_cst().strftime("%Y-%m-%d"),
+                      "model": latest["model"], "created_at": latest["created_at"]}
+    return JSONResponse({"sentiment": senti, "review": review, "ai_status": ai_status()})
+
+
+@app.get("/api/sentiment")
+def api_sentiment(hours: int = Query(24, ge=1, le=720)):
+    if not ai:
+        raise HTTPException(503, "AI 模块不可用")
+    return JSONResponse(ai.sentiment_stats(hours))
+
+
+@app.get("/api/daily-review")
+def api_daily_review(request: Request, date: str = Query(""), regenerate: int = Query(0)):
+    """读取/生成每日复盘。regenerate=1 且为 admin 时强制重算。"""
+    user = current_user(request)
+    if not ai:
+        raise HTTPException(503, "AI 模块不可用")
+    if regenerate == 1:
+        if not (is_vip(user) and user["role"] == "admin"):
+            raise HTTPException(403, "仅管理员可强制重算")
+        date = date or now_cst().strftime("%Y-%m-%d")
+        try:
+            db.save_ai_report("daily_review", date, "")  # 先清缓存避免复用
+            return JSONResponse(ai.daily_review(date))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, f"复盘生成失败: {e}") from e
+    date = date or now_cst().strftime("%Y-%m-%d")
+    cached = db.get_ai_report("daily_review", date)
+    if not cached:
+        return JSONResponse({"cached": False, "content": "", "date": date, "pending": True})
+    return JSONResponse({"cached": True, "content": cached["content"], "date": date,
+                         "model": cached["model"], "created_at": cached["created_at"]})
+
+
+@app.get("/api/ai/stock/{code}")
+def api_stock_ai(request: Request, code: str, force: int = Query(0)):
+    """个股 AI 分析（会员；force=1 需 admin）。"""
+    user = current_user(request)
+    if not user:
+        raise HTTPException(401, "请先登录")
+    if not ai:
+        raise HTTPException(503, "AI 模块不可用")
+    if force == 1 and not (is_vip(user) and user["role"] == "admin"):
+        raise HTTPException(403, "仅管理员可强制重算")
+    try:
+        return JSONResponse(ai.stock_analysis(code, force=bool(force)))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"个股分析失败: {e}") from e
+
+
+@app.get("/api/ai/stock")
+def api_stock_ai_query(request: Request, code: str = Query(...), force: int = Query(0)):
+    return api_stock_ai(request, code, force)
+
+
+@app.post("/api/ai/trigger")
+def api_ai_trigger(request: Request):
+    """管理员手动触发：快讯批量解读 + 盘后复盘。"""
+    user = current_user(request)
+    if not (is_vip(user) and user["role"] == "admin"):
+        raise HTTPException(403, "仅管理员可触发")
+    if not ai:
+        raise HTTPException(503, "AI 模块不可用")
+    out = {"brief": ai.classify_pending(limit=20), "review": ai.generate_daily_review_if_due()}
+    return JSONResponse(out)
+
+
+@app.get("/api/ai/brief/{brief_id}")
+def api_brief_ai(brief_id: int):
+    """读取快讯 AI 解读结果。"""
+    if not ai:
+        raise HTTPException(503, "AI 模块不可用")
+    row = db.get_ai_report("brief_ai", str(brief_id))
+    if not row:
+        return JSONResponse({"pending": True, "exists": False})
+    try:
+        content = json.loads(row["content"])
+    except Exception:  # noqa: BLE001
+        content = {"raw": row["content"]}
+    return JSONResponse({"pending": False, "exists": True, "result": content,
+                         "model": row["model"], "created_at": row["created_at"]})
+
+
+@app.get("/api/stream")
+def api_stream(request: Request, since_id: int = Query(0, ge=0)):
+    """SSE：推送新快讯 + AI 解读结果（供 insight 页实时刷新）。"""
+    import asyncio as _aio
+
+    async def _iter():
+        # 建立连接即发一条心跳，确认流可用
+        yield "event: hello\ndata: {\"ok\":true,\"ai\":%s}\n\n" % ("true" if ai else "false")
+        last_id = since_id
+        if last_id == 0:
+            # 未指定起点则从当前最新 id 开始，只推新数据，不回放历史
+            last_id = get_conn().execute("SELECT COALESCE(MAX(id),0) FROM brief_items").fetchone()[0]
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                conn = get_conn()
+                rows = conn.execute(
+                    """SELECT b.id, b.source_label, b.title, b.published_at
+                       FROM brief_items b WHERE b.id > ? ORDER BY b.id ASC LIMIT 20""",
+                    (last_id,),
+                ).fetchall()
+                if rows:
+                    for r in rows:
+                        ai_row = db.get_ai_report("brief_ai", str(r["id"]))
+                        ai_res = None
+                        if ai_row:
+                            try:
+                                ai_res = json.loads(ai_row["content"])
+                            except Exception:  # noqa: BLE001
+                                ai_res = None
+                        payload = {"id": r["id"], "source": r["source_label"],
+                                   "title": r["title"], "published_at": r["published_at"],
+                                   "ai": ai_res}
+                        yield f"event: brief\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                    last_id = max(last_id, max(r["id"] for r in rows))
+            except Exception as e:  # noqa: BLE001
+                yield f"event: error\ndata: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+            await _aio.sleep(60)
+
+    return StreamingResponse(
+        _iter(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # 禁用 nginx 缓冲
+        },
+    )
 
 
 if __name__ == "__main__":

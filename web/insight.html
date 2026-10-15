@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}AI 洞察{% endblock %}
+{% block content %}
+<section class="panel hero">
+  <div class="row-between">
+    <div>
+      <h1>AI 智能洞察</h1>
+      <p>快讯情绪识别 · 市场多空指数 · 每日 AI 复盘 · 个股 AI 分析。</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+      {% if ai_status.enabled %}
+        <span class="chip on" id="ai-status-chip"><svg class="icon" aria-hidden="true" style="width:15px;height:15px"><use href="#i-zap"/></svg>AI 在线 · {{ ai_status.model }}</span>
+      {% else %}
+        <span class="chip muted">AI 未启用</span>
+      {% endif %}
+      <span class="chip muted" id="stream-state" data-active="{{ user is not none }}"><svg class="icon" aria-hidden="true" style="width:15px;height:15px"><use href="#i-clock"/></svg>实时流：未连接</span>
+    </div>
+  </div>
+
+  {% if user and user.role == 'admin' %}
+  <div class="chips" role="group" aria-label="AI 操作">
+    <button type="button" id="btn-trigger-ai" class="chip">⚡ 立即触发 AI 解读</button>
+    <button type="button" id="btn-regen-review" class="chip">📝 重新生成今日复盘</button>
+    <span class="chip muted" id="ai-trigger-status"></span>
+  </div>
+  {% endif %}
+</section>
+
+<!-- 情绪仪表盘 -->
+<section class="panel">
+  <h2 class="sec-title">市场情绪 · 近 24 小时</h2>
+  <div class="senti-grid">
+    <div class="senti-card senti-pos">
+      <div class="senti-num" id="senti-pos">{{ senti.counts.positive|default(0) }}</div>
+      <div class="senti-label">利好</div>
+    </div>
+    <div class="senti-card senti-neg">
+      <div class="senti-num" id="senti-neg">{{ senti.counts.negative|default(0) }}</div>
+      <div class="senti-label">利空</div>
+    </div>
+    <div class="senti-card senti-neu">
+      <div class="senti-num" id="senti-neu">{{ senti.counts.neutral|default(0) }}</div>
+      <div class="senti-label">中性</div>
+    </div>
+    <div class="senti-card bull">
+      <div class="senti-num" id="bull-index">{{ senti.bull_index|default(0) }}</div>
+      <div class="senti-label">多空指数</div>
+    </div>
+  </div>
+  <div class="senti-bar-wrap">
+    <div class="senti-bar">
+      <span class="bar-pos" id="bar-pos" style="width:{{ ((senti.ratio.positive|default(0))*100)|round(1) }}%"></span>
+      <span class="bar-neu" id="bar-neu" style="width:{{ ((senti.ratio.neutral|default(0))*100)|round(1) }}%"></span>
+      <span class="bar-neg" id="bar-neg" style="width:{{ ((senti.ratio.negative|default(0))*100)|round(1) }}%"></span>
+    </div>
+  </div>
+  <p class="muted-note" id="senti-meta">
+    已解读 <span id="senti-total">{{ senti.total|default(0) }}</span> 条快讯{% if senti.avg_impact %} · 平均影响度 {{ senti.avg_impact }}{% endif %}
+  </p>
+</section>
+
+<!-- 每日 AI 复盘 -->
+<section class="panel">
+  <div class="row-between">
+    <h2 class="sec-title" style="margin:0">每日 AI 复盘</h2>
+    <input type="date" id="review-date" value="{{ today }}" class="date-pick">
+  </div>
+  <div id="review-body" class="md-body">
+    <div class="empty">加载中…</div>
+  </div>
+</section>
+
+<!-- 个股 AI 分析 -->
+<section class="panel">
+  <h2 class="sec-title">个股 AI 分析</h2>
+  <form class="search-form" id="stock-ai-form" onsubmit="return false;" style="margin-top:0">
+    <label for="stock-ai-code" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">股票代码</label>
+    <input id="stock-ai-code" type="text" placeholder="输入股票代码，例如 600519 / 300750" maxlength="16" style="flex:1 1 240px">
+    <button type="submit" id="btn-stock-ai">AI 分析</button>
+    {% if user and user.role == 'admin' %}
+    <button type="button" class="ghost" id="btn-stock-ai-force">强制重算</button>
+    {% endif %}
+  </form>
+  <div id="stock-ai-body" class="md-body" style="margin-top:14px">
+    <div class="empty">输入代码查看个股技术与消息面综合解读。</div>
+  </div>
+</section>
+
+<!-- 实时快讯流 -->
+<section class="panel">
+  <div class="row-between">
+    <h2 class="sec-title" style="margin:0">实时快讯 · AI 解读流</h2>
+    <span class="chip muted">30 秒自动刷新</span>
+  </div>
+  <div id="live-feed" class="timeline" style="margin-top:12px">
+    <div class="empty">等待实时数据接入…</div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+
+  // —— 情绪数据刷新 ——
+  async function refreshSentiment() {
+    try {
+      const r = await fetch('/api/sentiment?hours=24');
+      if (!r.ok) return;
+      const d = await r.json();
+      $('#senti-pos').textContent = d.counts.positive;
+      $('#senti-neg').textContent = d.counts.negative;
+      $('#senti-neu').textContent = d.counts.neutral;
+      $('#bull-index').textContent = d.bull_index;
+      $('#senti-total').textContent = d.total;
+      $('#bar-pos').style.width = (d.ratio.positive * 100).toFixed(1) + '%';
+      $('#bar-neu').style.width = (d.ratio.neutral * 100).toFixed(1) + '%';
+      $('#bar-neg').style.width = (d.ratio.negative * 100).toFixed(1) + '%';
+      $('#senti-meta').textContent = `已解读 ${d.total} 条快讯` + (d.avg_impact ? ` · 平均影响度 ${d.avg_impact}` : '');
+    } catch (e) { /* 忽略 */ }
+  }
+
+  // —— 每日复盘 ——
+  async function loadReview(date) {
+    const body = $('#review-body');
+    body.innerHTML = '<div class="empty">加载中…</div>';
+    try {
+      const r = await fetch('/api/daily-review?date=' + encodeURIComponent(date));
+      const d = await r.json();
+      if (d.cached && d.content) {
+        body.innerHTML = markedLite(d.content);
+      } else if (d.pending) {
+        body.innerHTML = '<div class="notice">该日期还没有生成复盘。盘后 15:30 后会自动生成，或由管理员手动触发。</div>';
+      } else {
+        body.innerHTML = '<div class="empty">暂无复盘。管理员可点「重新生成今日复盘」。</div>';
+      }
+    } catch (e) {
+      body.innerHTML = '<div class="notice">复盘加载失败：' + esc(e.message) + '</div>';
+    }
+  }
+
+  // —— 轻量 markdown 渲染（与后端 md_to_html 对齐） ——
+  function markedLite(text) {
+    let html = [];
+    for (let line of String(text).split(/\r?\n/)) {
+      let s = line.replace(/</g, '&lt;').replace(/>/g, '&gt;').trimEnd();
+      if (!s.trim()) { html.push(''); continue; }
+      if (s.startsWith('### ')) html.push(`<h4 class="md-h4">${esc(s.slice(4))}</h4>`);
+      else if (s.startsWith('## ')) html.push(`<h3 class="md-h3">${esc(s.slice(3))}</h3>`);
+      else if (s.startsWith('# ')) html.push(`<h2 class="md-h2">${esc(s.slice(2))}</h2>`);
+      else if (s.startsWith('- ')) html.push(`<li class="md-li">${esc(s.slice(2))}</li>`);
+      else if (/^\d+\.\s/.test(s)) html.push(`<li class="md-li">${esc(s.replace(/^\d+\.\s/, ''))}</li>`);
+      else html.push(`<p class="md-p">${esc(s)}</p>`);
+    }
+    return html.join('\n');
+  }
+
+  // —— 个股分析 ——
+  async function loadStockAI(code, force) {
+    const body = $('#stock-ai-body');
+    body.innerHTML = '<div class="empty">分析中，约 10–30 秒…</div>';
+    try {
+      const r = await fetch(`/api/ai/stock?code=${encodeURIComponent(code)}&force=${force ? 1 : 0}`);
+      const d = await r.json();
+      if (d.error) { body.innerHTML = '<div class="notice">' + esc(d.error) + '</div>'; return; }
+      body.innerHTML = markedLite(d.content) + (d.cached ? '<p class="muted-note">（缓存结果 · ' + esc(d.model || '') + ' · ' + esc(d.created_at || '') + '）</p>' : '');
+    } catch (e) {
+      body.innerHTML = '<div class="notice">分析失败：' + esc(e.message) + '</div>';
+    }
+  }
+
+  // —— 实时流（SSE + 轮询兜底） ——
+  let lastSeenId = 0;
+  function renderFeedItems(items) {
+    const feed = $('#live-feed');
+    if (!feed) return;
+    let el = feed.querySelector('.empty');
+    if (el) el.remove();
+    for (const it of items) {
+      const div = document.createElement('article');
+      div.className = 'item';
+      const aiTag = it.ai
+        ? `<span class="tag ${it.ai.sentiment === 'positive' ? 't-pos' : it.ai.sentiment === 'negative' ? 't-neg' : 't-neu'}">${esc(it.ai.sentiment === 'positive' ? '利好' : it.ai.sentiment === 'negative' ? '利空' : '中性')} · ${esc(it.ai.summary || '')}</span>`
+        : '<span class="tag muted-tag">分析中…</span>';
+      div.innerHTML = `
+        <div class="item-top">
+          <span class="src ${''}">${esc(it.source)}</span>
+          <span class="item-time">${esc(it.published_at)}</span>
+        </div>
+        <div class="item-title">${esc(it.title)}</div>
+        <div class="tags">${aiTag}</div>`;
+      feed.prepend(div);
+      if (feed.children.length > 40) feed.removeChild(feed.lastChild);
+    }
+  }
+  async function pollFeed() {
+    try {
+      const r = await fetch('/api/brief?page_size=8' + (lastSeenId ? '' : ''));
+      if (!r.ok) return;
+      const d = await r.json();
+      const fresh = d.rows.filter(x => x.id > lastSeenId);
+      // brief 列表不带 ai 标签，单独再抓每一个有 id 的 ai 结果
+      if (fresh.length) {
+        lastSeenId = Math.max(lastSeenId, ...fresh.map(x => x.id));
+        for (const it of fresh) {
+          let ai = null;
+          try {
+            const ar = await fetch('/api/ai/brief/' + it.id);
+            const ad = await ar.json();
+            if (!ad.pending) ai = ad.result;
+          } catch (e) {}
+          renderFeedItems([{ id: it.id, source: it.source_label, title: it.title, published_at: it.published_at, ai }]);
+        }
+      }
+    } catch (e) {}
+  }
+
+  // SSE 连接（若可用）+ 轮询兜底
+  function connectSSE() {
+    const state = $('#stream-state');
+    if (!state || state.dataset.active !== 'true') return;
+    try {
+      const es = new EventSource('/api/stream');
+      state.textContent = '实时流：已连接';
+      state.classList.add('on');
+      es.addEventListener('brief', (ev) => {
+        try {
+          const d = JSON.parse(ev.data);
+          lastSeenId = Math.max(lastSeenId, d.id);
+          renderFeedItems([d]);
+        } catch (e) {}
+      });
+      es.onerror = () => {
+        state.textContent = '实时流：重连中（轮询兜底）';
+        state.classList.remove('on');
+        es.close();
+      };
+    } catch (e) {
+      state.textContent = '实时流：不可用（轮询兜底）';
+    }
+  }
+
+  // —— 绑定事件 ——
+  document.getElementById('review-date').addEventListener('change', (e) => loadReview(e.target.value));
+  $('#stock-ai-form').addEventListener('submit', () => loadStockAI($('#stock-ai-code').value.trim(), false));
+  const forceBtn = $('#btn-stock-ai-force');
+  if (forceBtn) forceBtn.addEventListener('click', () => loadStockAI($('#stock-ai-code').value.trim(), true));
+
+  const trigBtn = $('#btn-trigger-ai');
+  if (trigBtn) trigBtn.addEventListener('click', async () => {
+    const st = $('#ai-trigger-status');
+    trigBtn.disabled = true; st.textContent = '触发中…';
+    try {
+      const r = await fetch('/api/ai/trigger', { method: 'POST' });
+      const d = await r.json();
+      st.textContent = `快讯解读 ${d.brief.done} 条 · 复盘 ${d.review.ok ? '已生成' : d.review.skipped ? '未到盘后' : '失败'}`;
+      refreshSentiment();
+    } catch (e) { st.textContent = '触发失败：' + e.message; }
+    trigBtn.disabled = false;
+  });
+  const regenBtn = $('#btn-regen-review');
+  if (regenBtn) regenBtn.addEventListener('click', async () => {
+    const st = $('#ai-trigger-status');
+    regenBtn.disabled = true; st.textContent = '重新生成中（约 30–60 秒）…';
+    try {
+      const r = await fetch('/api/daily-review?regenerate=1');
+      const d = await r.json();
+      if (d.content) $('#review-body').innerHTML = markedLite(d.content);
+      st.textContent = '已生成';
+    } catch (e) { st.textContent = '失败：' + e.message; }
+    regenBtn.disabled = false;
+  });
+
+  // 初始化
+  refreshSentiment();
+  loadReview($('#review-date').value);
+  connectSSE();
+  pollFeed();
+  setInterval(refreshSentiment, 30000);
+  setInterval(pollFeed, 30000);
+})();
+</script>
+{% endblock %}
