@@ -14,13 +14,13 @@
     { key: 'm5', label: '5分' }
   ];
   var MA_DEFS = [
-    { key: 'ma5', label: 'MA5', color: '#f5a623' },
-    { key: 'ma10', label: 'MA10', color: '#2b8cf0' },
-    { key: 'ma20', label: 'MA20', color: '#c026d3' },
-    { key: 'ma60', label: 'MA60', color: '#12a594' }
+    { key: 'ma5', label: 'MA5', color: '#e2b93b' },
+    { key: 'ma10', label: 'MA10', color: '#6b96ff' },
+    { key: 'ma20', label: 'MA20', color: '#c07bff' },
+    { key: 'ma60', label: 'MA60', color: '#3ecf8e' }
   ];
 
-  /* 颜色从 CSS 变量读取，自动跟随亮/暗模式与主题 */
+  /* 颜色从 CSS 变量读取，自动跟随主题 */
   function themeColor(name, fallback) {
     try {
       var v = getComputedStyle(document.documentElement).getPropertyValue(name);
@@ -31,21 +31,21 @@
   }
   function theme() {
     return {
-      up: themeColor('--up', '#d92d20'),
-      down: themeColor('--down', '#067647'),
-      ink300: themeColor('--ink-300', '#94a3b8'),
-      ink400: themeColor('--ink-400', '#64748b'),
-      ink500: themeColor('--ink-500', '#475569'),
-      ink700: themeColor('--ink-700', '#1e293b'),
-      surface: themeColor('--surface', '#ffffff'),
-      line: themeColor('--line', '#e2e8f0'),
-      grid: themeColor('--line', '#e2e8f0')
+      up: themeColor('--up', '#f0616d'),
+      down: themeColor('--down', '#3ecf8e'),
+      ink300: themeColor('--ink-300', '#62666d'),
+      ink400: themeColor('--ink-400', '#8a8f98'),
+      ink500: themeColor('--ink-500', '#a3a9b3'),
+      ink700: themeColor('--ink-700', '#e2e6ec'),
+      surface: themeColor('--surface', '#0f1011'),
+      line: themeColor('--line', '#23252a'),
+      grid: themeColor('--line', '#23252a')
     };
   }
 
   /* 网格线用半透明，避免压过 K 线主体 */
   function gridColor() {
-    var c = themeColor('--line', '#e2e8f0');
+    var c = themeColor('--line', '#23252a');
     return c;
   }
 

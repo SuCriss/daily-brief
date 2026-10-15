@@ -3,7 +3,7 @@
 {% block content %}
 <section class="panel member-only-page" style="text-align:center;padding:40px 22px">
   <span class="chip muted"><svg class="icon" aria-hidden="true" style="width:15px;height:15px"><use href="#i-shield"/></svg>会员可见</span>
-  <h1 style="margin:16px 0 10px;font-size:28px;color:var(--ink-900);font-weight:800">{{ gate_title }}</h1>
+  <h1 style="margin:16px 0 10px;font-size:24px;color:var(--ink-900);font-weight:600">{{ gate_title }}</h1>
   <p style="max-width:640px;margin:0 auto;color:var(--ink-500);font-size:14px">
     此页面仅对会员可见。
   </p>
@@ -30,8 +30,8 @@
   </div>
 
   <p style="margin-top:26px;color:var(--ink-400);font-size:13px">
-    访客可查看 <a href="/search" style="color:var(--brand);font-weight:700;text-decoration:none">全站搜索</a>
-    与 <a href="/news-wire" style="color:var(--brand);font-weight:700;text-decoration:none">全网热搜</a>
+    访客可查看 <a href="/search" style="color:var(--brand-strong);font-weight:600;text-decoration:none">全站搜索</a>
+    与 <a href="/news-wire" style="color:var(--brand-strong);font-weight:600;text-decoration:none">全网热搜</a>
     （限 {{ free_delay_hours }} 小时前的信息）。
   </p>
 </section>

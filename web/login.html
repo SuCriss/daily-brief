@@ -2,7 +2,7 @@
 {% block title %}登录{% endblock %}
 {% block content %}
 <section class="panel" style="max-width:520px;margin:40px auto">
-  <h1 style="margin:0 0 6px;font-size:24px;color:var(--ink-900);font-weight:800">账号登录</h1>
+  <h1 style="margin:0 0 6px;font-size:24px;color:var(--ink-900);font-weight:600">账号登录</h1>
   <p style="margin:0 0 20px;color:var(--ink-500);font-size:14px">登录后可查看完整时间线与统计服务。勾选“长期保存登录”会保持较长时间登录状态。</p>
   {% if error %}<div class="alert err" style="margin-bottom:16px" role="alert">用户名或密码不正确。</div>{% endif %}
   <form class="form-stack" method="post" action="/login">
@@ -26,7 +26,7 @@
     </button>
   </form>
   <p style="margin-top:18px;font-size:14px;color:var(--ink-500)">
-    还没有账号？<a href="/register" style="color:var(--brand);font-weight:700;text-decoration:none">立即注册</a>
+    还没有账号？<a href="/register" style="color:var(--brand-strong);font-weight:600;text-decoration:none">立即注册</a>
   </p>
 </section>
 {% endblock %}
