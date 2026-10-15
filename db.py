@@ -175,31 +175,6 @@ CREATE TABLE IF NOT EXISTS fetch_log (
     message    TEXT,
     ran_at     TEXT NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS ai_reports (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    kind       TEXT NOT NULL,              -- brief_ai | daily_review | stock_ai
-    ref_key    TEXT NOT NULL,              -- brief_id / review_date / stock_code
-    model      TEXT,
-    content    TEXT NOT NULL,              -- 结构化 JSON 或 Markdown 正文
-    meta       TEXT,                       -- 附加 JSON（情绪/题材标签等）
-    tokens_in  INTEGER DEFAULT 0,
-    tokens_out INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL,
-    UNIQUE(kind, ref_key)
-);
-CREATE INDEX IF NOT EXISTS idx_ai_kind ON ai_reports(kind, created_at DESC);
-
-CREATE TABLE IF NOT EXISTS ai_usage (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    kind       TEXT NOT NULL,              -- brief_ai | daily_review | stock_ai
-    tokens_in  INTEGER DEFAULT 0,
-    tokens_out INTEGER DEFAULT 0,
-    credits    REAL DEFAULT 0,
-    status     TEXT NOT NULL,              -- ok | error
-    message    TEXT,
-    ran_at     TEXT NOT NULL
-);
 """
 
 
@@ -240,39 +215,4 @@ def stats() -> dict:
         "members": q("SELECT COUNT(*) FROM members"),
         "latest_brief": q("SELECT MAX(published_at) FROM brief_items"),
         "latest_fetch": q("SELECT MAX(ran_at) FROM fetch_log"),
-        "ai_reports": q("SELECT COUNT(*) FROM ai_reports"),
-        "ai_ok": q("SELECT COUNT(*) FROM ai_usage WHERE status='ok'"),
-        "ai_tokens": q("SELECT COALESCE(SUM(tokens_in+tokens_out),0) FROM ai_usage"),
     }
-
-
-# --------------------------------------------------------------------------
-# AI 报告存取
-# --------------------------------------------------------------------------
-def save_ai_report(kind: str, ref_key: str, content: str, *, model: str = "",
-                   meta: str = "", tokens_in: int = 0, tokens_out: int = 0) -> bool:
-    """写入/覆盖一条 AI 报告。返回是否为新增。"""
-    with tx() as conn:
-        cur = conn.execute(
-            """INSERT OR REPLACE INTO ai_reports
-               (kind, ref_key, model, content, meta, tokens_in, tokens_out, created_at)
-               VALUES (?,?,?,?,?,?,?,?)""",
-            (kind, ref_key, model, content, meta, tokens_in, tokens_out, fmt_cst()),
-        )
-        return cur.rowcount > 0
-
-
-def get_ai_report(kind: str, ref_key: str) -> dict | None:
-    row = get_conn().execute(
-        "SELECT * FROM ai_reports WHERE kind=? AND ref_key=?", (kind, ref_key)
-    ).fetchone()
-    return dict(row) if row else None
-
-
-def log_ai_usage(kind: str, status: str, *, tokens_in: int = 0, tokens_out: int = 0,
-                 credits: float = 0.0, message: str = "") -> None:
-    get_conn().execute(
-        """INSERT INTO ai_usage(kind, tokens_in, tokens_out, credits, status, message, ran_at)
-           VALUES (?,?,?,?,?,?,?)""",
-        (kind, tokens_in, tokens_out, credits, status, message[:500], fmt_cst()),
-    )

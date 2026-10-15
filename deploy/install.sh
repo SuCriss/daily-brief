@@ -28,17 +28,6 @@ echo "=== 2) 数据目录 ==="
 mkdir -p "$DATA_DIR"
 
 echo
-echo "=== 2.5) AI 密钥文件 ==="
-if [ ! -f "$DATA_DIR/ai.env" ]; then
-    printf '# AI 网关密钥（部署时由管理员写入，不进版本库）\n# AI_API_KEY=sk-xxx\n' > "$DATA_DIR/ai.env"
-    chmod 600 "$DATA_DIR/ai.env"
-    echo "已创建 $DATA_DIR/ai.env（空模板，需手工填 AI_API_KEY）"
-else
-    chmod 600 "$DATA_DIR/ai.env"
-    echo "已存在 $DATA_DIR/ai.env，保持不变"
-fi
-
-echo
 echo "=== 3) Python 虚拟环境 + 依赖 ==="
 if [ ! -x "$VENV/bin/python" ]; then
     python3 -m venv "$VENV"

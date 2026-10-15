@@ -53,14 +53,13 @@ sign = md5( sha1( "&".join(f"{k}={v}" for k,v in sorted(params.items())) ) )
 
 ```
 daily-brief/
-├── db.py           数据层（SQLite）：raw_items / brief_items / stocks / sectors / mentions / members … + ai_reports / ai_usage
+├── db.py           数据层（SQLite）：raw_items / brief_items / stocks / sectors / mentions / members …
 ├── sources.py      采集层：6 个上游源适配器 + 财联社签名 + 去重落库
 ├── imgs.py         图片归一化层：统一各家图片格式、过滤占位图、代理白名单
 ├── kline.py        K线数据层：日/周/月 + 分钟级 K 线，归一化、均线计算与缓存
 ├── extract.py      抽取层：A股字典(5573只) + 板块词典 + 提及抽取 + 热度排名/趋势
-├── ai.py           AI 智能分析层：快讯情绪解读 / 每日复盘 / 个股分析 / 情绪统计
-├── app.py          Web 层：FastAPI 路由 + 会员分层 + 认证 + 图片代理 + K线接口 + AI 洞察 + SSE
-├── scheduler.py    调度层：热搜 2min / 快讯 1min 周期采集 + AI 自动解读 + 盘后复盘
+├── app.py          Web 层：FastAPI 路由 + 会员分层 + 认证 + 图片代理 + K线接口
+├── scheduler.py    调度层：热搜 2min / 快讯 1min 周期采集
 ├── cli.py          命令行工具
 ├── verify.py       端到端验证脚本
 └── web/*.html      Jinja2 模板（kline.js 为纯 Canvas K线弹窗，无第三方依赖）
@@ -150,31 +149,6 @@ python scheduler.py
 python verify.py
 ```
 
-## 四、AI 智能分析层（可选增强）
-
-`ai.py` 提供三大 AI 能力，全部走 OpenAI 兼容 `/chat/completions` 协议，通过环境变量切换上游网关：
-
-| 能力 | 说明 | 触发方式 |
-|---|---|---|
-| 快讯情绪解读 | 对单条快讯做利好/利空/中性判断 + 0–100 影响度 + 题材标签 + 一句话解读 | 调度器每轮自动对「重要/有提及」的新快讯解读（预算可调） |
-| 市场情绪统计 | 聚合 24h 情绪分布 → 多空指数(-100~100)、平均影响度、分时曲线 | `/api/sentiment`，`/insight` 页实时刷新 |
-| 每日 AI 复盘 | 汇总当日快讯/热度/情绪，生成 Markdown 盘后复盘（主线板块、强势个股、风险、明日关注） | 每日 15:30 后自动生成；管理员可手动触发生成 |
-| 个股 AI 分析 | K 线技术面摘要 + 消息面情绪，综合解读（缓存 24h） | `/api/ai/stock/{code}`，`/insight` 页 |
-
-配置环境变量：
-
-```bash
-export AI_ENABLED=1
-export AI_BASE_URL=http://127.0.0.1:3065/v1   # 服务器内网直连 agent2api 网关
-export AI_API_KEY=sk-xxx                        # 服务器经 /opt/daily-brief/data/ai.env 注入
-export AI_MODEL=Qwen3.8-Flash
-export AI_BRIEF_BUDGET=10                       # 每轮最多解读快讯数（控 token）
-```
-
-AI 报告缓存进 `ai_reports` 表（kind: brief_ai / daily_review / stock_ai），用量记录进 `ai_usage` 表。
-
-访问 `/insight`（需登录）查看：情绪仪表盘、每日复盘、个股分析、实时快讯流（SSE `/api/stream` + 轮询兜底）。
-
 常用命令：
 
 ```bash
@@ -187,14 +161,13 @@ python cli.py extract                    # 只跑抽取
 
 ---
 
-## 五、页面与分层
+## 四、页面与分层
 
 | 路由 | 说明 | 访客 |
 |---|---|---|
 | `/` | 每日快讯时间线（主页面） | 门禁页 |
 | `/stocks` | 股票统计：热度排名 + 个股异动明细 | 门禁页 |
 | `/sectors` | 板块统计：热度排名 + 板块异动明细 | 门禁页 |
-| `/insight` | AI 洞察：情绪仪表盘 / 每日复盘 / 个股分析 / 实时流 | 需登录 |
 | `/monitor-keywords` | 自定义关键词监控 | 需登录 |
 | `/news-wire` | 全网热搜 | 开放 |
 | `/search` | 全站搜索（快讯/热搜/个股/板块） | 开放，限 3 小时前 |
@@ -202,13 +175,12 @@ python cli.py extract                    # 只跑抽取
 | `/api/minute` | 当日分时 | 需登录 |
 | `/api/indexes` | 上证/深证/创业板指数快照 | 开放 |
 | `/api/brief` `/api/stocks` `/api/sectors` `/api/hot` `/api/stats` | JSON 接口 | 跟随分层 |
-| `/api/sentiment` `/api/daily-review` `/api/ai/stock/{code}` `/api/stream` | AI 接口 / SSE 实时流 | 需登录 |
 
 分层开关：`GATE_ENABLED=0` 环境变量可让访客也直接看到全部页面（自建站点可自行决定）。
 
 ---
 
-## 六、上游源与可用性（实测）
+## 五、上游源与可用性（实测）
 
 | 源 | 接口 | 状态 |
 |---|---|---|
@@ -224,7 +196,7 @@ python cli.py extract                    # 只跑抽取
 
 ---
 
-## 七、服务器部署（a-stock.chrisite.eu.cc）
+## 六、服务器部署（a-stock.chrisite.eu.cc）
 
 线上地址：<https://a-stock.chrisite.eu.cc> · 服务器 `192.3.13.21`（Ubuntu 24.04）
 
@@ -272,7 +244,7 @@ scp /tmp/brief.db root@192.3.13.21:/opt/daily-brief/data/brief.db
 ssh root@192.3.13.21 'systemctl restart daily-brief-web daily-brief-scheduler'
 ```
 
-## 八、注意事项
+## 七、注意事项
 
 - 采集频率请遵守各上游源的 robots 与服务条款，默认节奏（热搜 2min / 快讯 1min）已与目标站自述一致，可按需调大间隔：`HOT_INTERVAL` / `NEWS_INTERVAL` 环境变量。
 - 数据仅作信息聚合，不构成投资建议（沿用目标站同样的免责声明口径）。

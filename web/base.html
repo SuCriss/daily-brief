@@ -368,38 +368,6 @@ footer{
 }
 
 /* ==========================================================================
-   AI 洞察页
-   ========================================================================== */
-.sec-title{margin:0 0 14px;font-size:15px;color:var(--ink-900);font-weight:600;letter-spacing:-.01em}
-.muted-note{color:var(--ink-400);font-size:12px;margin:10px 0 0}
-.senti-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
-.senti-card{padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
-.senti-num{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
-.senti-label{font-size:12px;font-weight:500;color:var(--ink-400);margin-top:4px}
-.senti-pos .senti-num{color:var(--up)}
-.senti-neg .senti-num{color:var(--down)}
-.senti-neu .senti-num{color:var(--ink-600)}
-.senti-card.bull{border-color:var(--brand-soft-2);background:var(--brand-soft)}
-.senti-card.bull .senti-num{color:var(--brand-strong)}
-.senti-bar-wrap{margin-bottom:4px}
-.senti-bar{display:flex;height:10px;border-radius:var(--r-sm);overflow:hidden;background:var(--surface-3)}
-.bar-pos{background:var(--up)}
-.bar-neu{background:var(--ink-300)}
-.bar-neg{background:var(--down)}
-.md-body{font-size:14px;line-height:1.7;color:var(--ink-600)}
-.md-h2,.md-h3,.md-h4{margin:14px 0 6px;color:var(--ink-900);line-height:1.4}
-.md-h2{font-size:17px;border-bottom:1px solid var(--line);padding-bottom:6px;font-weight:600;letter-spacing:-.01em}
-.md-h3{font-size:15px;font-weight:600}
-.md-h4{font-size:13px;color:var(--brand-strong);font-weight:500}
-.md-p{margin:6px 0}
-.md-li{list-style:disc;margin-left:22px;margin-top:4px}
-.date-pick{padding:8px 12px;min-height:38px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);color:var(--ink-700);font-size:13px;font-family:inherit}
-.t-pos{background:var(--up-soft);color:var(--up)}
-.t-neg{background:var(--down-soft);color:var(--down)}
-.t-neu{background:var(--surface-3);color:var(--ink-500)}
-.muted-tag{background:var(--surface-3);color:var(--ink-400)}
-
-/* ==========================================================================
    K 线弹窗
    ========================================================================== */
 body.kline-open{overflow:hidden}
@@ -517,7 +485,6 @@ body.kline-open{overflow:hidden}
     <symbol id="i-userplus" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
-    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2L4.1 12.6c-.3.4 0 1 .5 1H11l-1 8 8.9-10.6c.3-.4 0-1-.5-1H13l1-8z"/></symbol>
   </defs>
 </svg>
 
@@ -552,8 +519,6 @@ body.kline-open{overflow:hidden}
         <svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>股票统计</a>
       <a href="/sectors" class="{{ 'active' if active=='sectors' else '' }}">
         <svg class="icon" aria-hidden="true"><use href="#i-grid"/></svg>板块统计</a>
-      <a href="/insight" class="{{ 'active' if active=='insight' else '' }}">
-        <svg class="icon" aria-hidden="true"><use href="#i-zap"/></svg>AI 洞察</a>
       <div class="sep">监控</div>
       <a href="/monitor-keywords" class="{{ 'active' if active=='monitor' else '' }}">
         <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>自定义监控</a>
