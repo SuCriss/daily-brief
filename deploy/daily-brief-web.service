@@ -1,0 +1,26 @@
+[Unit]
+Description=daily-brief web (每日快讯 · FastAPI/uvicorn)
+Documentation=https://github.com/SuCriss/daily-brief
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/daily-brief
+
+Environment=DAILY_BRIEF_DB=/opt/daily-brief/data/brief.db
+Environment=PORT=8848
+Environment=GATE_ENABLED=1
+Environment=TZ=Asia/Shanghai
+
+ExecStart=/opt/daily-brief/venv/bin/python cli.py serve --host 127.0.0.1 --port 8848
+
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

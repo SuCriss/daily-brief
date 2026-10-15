@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}股票统计{% endblock %}
+{% block content %}
+<section class="panel hero">
+  <h1>股票统计</h1>
+  <p>统计快讯中个股被提及次数，做热度排名与趋势变化。点击名称查看 K 线，点击代码查看异动明细。</p>
+  <div class="chips" role="group" aria-label="时间范围">
+    {% for h, label in [(6,'6小时'),(24,'24小时'),(72,'3天'),(168,'7天')] %}
+      <a class="chip {{ 'on' if hours==h else '' }}" href="/stocks?hours={{ h }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+</section>
+
+{% if timeline %}
+<section class="panel">
+  <div class="row-between">
+    <h2 style="margin:0;font-size:20px;color:var(--ink-900)">个股异动明细</h2>
+    <a class="chip muted" href="/stocks?hours={{ hours }}">返回排名</a>
+  </div>
+  <div class="timeline" style="margin-top:14px">
+    {% for it in timeline %}
+    <article class="item">
+      <div class="item-top">
+        <span class="src {{ it.source }}">{{ it.source_label }}</span>
+        <span class="item-time">{{ it.published_at }}</span>
+      </div>
+      {% if it.url %}
+        <a class="item-title" href="{{ it.url }}" target="_blank" rel="noreferrer">{{ it.title }}</a>
+      {% else %}
+        <div class="item-title">{{ it.title }}</div>
+      {% endif %}
+      {% if it.body and it.body != it.title %}<p class="item-body">{{ it.body[:300] }}{% if it.body|length > 300 %}…{% endif %}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  <div class="row-between">
+    <h2 style="margin:0;font-size:20px;color:var(--ink-900)">热度排名（近 {{ hours }} 小时）</h2>
+    <span class="chip muted">{{ ranking|length }} 只个股</span>
+  </div>
+  {% if ranking %}
+  <div style="overflow:auto;margin-top:14px">
+  <table>
+    <caption style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">个股热度排名</caption>
+    <thead>
+      <tr>
+        <th scope="col">#</th><th scope="col">名称</th><th scope="col">代码</th>
+        <th scope="col">提及</th><th scope="col">上期</th><th scope="col">趋势</th><th scope="col">最近</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in ranking %}
+      <tr>
+        <td><span class="rank {{ 'top' if r.rank<=3 }}">{{ r.rank }}</span></td>
+        <td>
+          <a class="stock-link" href="/stocks?code={{ r.code }}&hours={{ hours }}"
+             data-kline-code="{{ r.code }}" data-kline-name="{{ r.name }}"
+             title="查看 {{ r.name }} K线"
+             style="font-weight:700;text-decoration:none;color:var(--ink-900)">{{ r.name }}</a>
+        </td>
+        <td style="color:var(--ink-400)">{{ r.code }}</td>
+        <td><strong style="color:var(--ink-900)">{{ r.mentions }}</strong></td>
+        <td style="color:var(--ink-400)">{{ r.prev_mentions }}</td>
+        <td>
+          <span class="trend {{ r.trend }}">
+            {% if r.trend=='up' %}↑ +{{ r.change }}{% elif r.trend=='down' %}↓ {{ r.change }}{% else %}—{% endif %}
+          </span>
+        </td>
+        <td style="color:var(--ink-400);font-size:12px">{{ r.last_at }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="empty">暂无统计数据。运行采集与抽取后再查看。</div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}每日快讯{% endblock %}
+{% block content %}
+<section class="panel hero">
+  <div class="row-between">
+    <div>
+      <h1>每日快讯</h1>
+      <p>汇总全网异动信息，按时间线快速查看市场变化。</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+      <span class="chip muted"><svg class="icon" aria-hidden="true" style="width:15px;height:15px"><use href="#i-brief"/></svg>共 {{ data.total }} 条</span>
+      <span class="chip muted"><svg class="icon" aria-hidden="true" style="width:15px;height:15px"><use href="#i-clock"/></svg>{{ stats.latest_fetch or '-' }}</span>
+    </div>
+  </div>
+
+  <form class="search-form" method="get" action="/" role="search">
+    <label for="brief-q" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">搜索快讯</label>
+    <input id="brief-q" type="search" name="q" value="{{ q }}"
+           placeholder="搜索快讯关键词，例如：算力 / 固态电池 / 600519" maxlength="80">
+    <button type="submit">
+      <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+      <span style="margin-left:6px">搜索</span>
+    </button>
+    {% if q or source or important %}<a class="chip muted" href="/" style="align-self:center">清除筛选</a>{% endif %}
+  </form>
+
+  <div class="chips" role="group" aria-label="来源筛选">
+    <a class="chip {{ 'on' if not source else '' }}" href="/?q={{ q }}">全部来源</a>
+    {% for key, label in [('cls','财联社'),('eastmoney','东财7×24'),('sina','新浪财经'),('weibo','微博热搜'),('baidu','百度热搜'),('douyin','抖音热搜')] %}
+      <a class="chip {{ 'on' if source==key else '' }}" href="/?q={{ q }}&source={{ key }}">{{ label }}</a>
+    {% endfor %}
+    <a class="chip {{ 'on' if important else '' }}" href="/?q={{ q }}&important=1">只看重要</a>
+  </div>
+
+  {% if not is_vip %}
+  <div class="gate">
+    <h3><svg class="icon" aria-hidden="true" style="width:17px;height:17px;vertical-align:-3px;margin-right:6px"><use href="#i-shield"/></svg>访客视图：只能查看 {{ free_delay_hours }} 小时前的信息</h3>
+    <p>登录会员可查看完整实时时间线、股票/板块热度统计与自定义关键词监控。</p>
+    <a class="btn-link" href="/login?next=/">登录 / 注册</a>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  {% if data.rows %}
+  <div class="timeline">
+    {% for it in data.rows %}
+    <article class="item {{ 'important' if it.is_important }}">
+      <div class="item-top">
+        <span class="src {{ it.source }}">{{ it.source_label }}</span>
+        <span class="item-time">{{ it.published_at }}</span>
+        {% if it.is_important %}<span class="tag important">重要</span>{% endif %}
+      </div>
+      {% if it.url %}
+        <a class="item-title" href="{{ it.url }}" target="_blank" rel="noreferrer">{{ it.title }}</a>
+      {% else %}
+        <div class="item-title">{{ it.title }}</div>
+      {% endif %}
+      {% if it.body and it.body != it.title %}
+        <p class="item-body">{{ it.body[:400] }}{% if it.body|length > 400 %}…{% endif %}</p>
+      {% endif %}
+      {% if it.images %}
+      <div class="imgs">
+        {% for img in it.images %}
+        <a class="img-link" href="{{ img }}" target="_blank" rel="noreferrer" title="点击查看原图">
+          <img src="{{ img }}" alt="快讯配图" loading="lazy" decoding="async" referrerpolicy="no-referrer"
+               onerror="this.closest('.img-link').classList.add('img-failed');this.remove();">
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if it.mentions %}
+      <div class="tags">
+        {% for m in it.mentions %}
+          {% if m.kind == 'stock' %}
+            <a class="tag" href="/stocks?code={{ m.ref_code }}" data-kline-code="{{ m.ref_code }}"
+               data-kline-name="{{ m.ref_name }}" title="查看 {{ m.ref_name }} K线">{{ m.ref_name }} {{ m.ref_code }}</a>
+          {% else %}
+            <a class="tag sector" href="/sectors?name={{ m.ref_name }}">{{ m.ref_name }}</a>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+
+  <nav class="pager" aria-label="分页">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      {% if data.page > 1 %}<a href="/?q={{ q }}&source={{ source }}&important={{ important }}&page={{ data.page-1 }}">上一页</a>{% endif %}
+      <span>第 {{ data.page }} / {{ data.pages }} 页</span>
+      {% if data.page < data.pages %}<a href="/?q={{ q }}&source={{ source }}&important={{ important }}&page={{ data.page+1 }}">下一页</a>{% endif %}
+    </div>
+    <span>{{ data.total }} 条记录</span>
+  </nav>
+  {% else %}
+  <div class="empty">
+    <svg class="icon" aria-hidden="true" style="width:34px;height:34px;stroke:var(--ink-300);margin-bottom:10px"><use href="#i-search"/></svg>
+    <div>没有符合条件的快讯。可以先运行一轮采集，或换一个关键词。</div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

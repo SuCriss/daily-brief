@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}全网热搜{% endblock %}
+{% block content %}
+<section class="panel hero">
+  <h1>全网热搜</h1>
+  <p>定时同步微博、百度、抖音热搜。列表按抓取时间倒序，点击标题跳转对应平台。</p>
+  <div class="chips">
+    <span class="chip muted"><svg class="icon" aria-hidden="true" style="width:15px;height:15px"><use href="#i-fire"/></svg>共 {{ data.total }} 条记录</span>
+    <span class="chip muted"><svg class="icon" aria-hidden="true" style="width:15px;height:15px"><use href="#i-clock"/></svg>{{ stats.latest_fetch or '-' }}</span>
+  </div>
+</section>
+
+<section class="panel">
+  {% if data.rows %}
+  <div class="timeline">
+    {% for it in data.rows %}
+    <article class="item">
+      <div class="item-top">
+        <span class="src {{ 'weibo' if it.source=='微' else ('baidu' if it.source=='百' else 'douyin') }}">{{ it.source }}</span>
+        {% if it.rank %}<span class="chip muted" style="min-height:26px;padding:3px 9px;font-size:12px">#{{ it.rank }}</span>{% endif %}
+        <span class="item-time">{{ it.captured_at }}</span>
+      </div>
+      {% if it.url %}
+        <a class="item-title" href="{{ it.url }}" target="_blank" rel="noreferrer">{{ it.title }}</a>
+      {% else %}
+        <div class="item-title">{{ it.title }}</div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  <nav class="pager" aria-label="分页">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      {% if data.page > 1 %}<a href="/news-wire?page={{ data.page-1 }}">上一页</a>{% endif %}
+      <span>第 {{ data.page }} / {{ data.pages }} 页</span>
+      {% if data.page < data.pages %}<a href="/news-wire?page={{ data.page+1 }}">下一页</a>{% endif %}
+    </div>
+    <span>{{ data.total }} 条</span>
+  </nav>
+  {% else %}
+  <div class="empty">暂无热搜数据，先运行一轮采集。</div>
+  {% endif %}
+</section>
+{% endblock %}

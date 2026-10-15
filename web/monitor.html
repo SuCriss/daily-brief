@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}自定义监控{% endblock %}
+{% block content %}
+<section class="panel hero">
+  <h1>自定义监控</h1>
+  <p>自行设置关键词，监控全文异动。命中后在这里按时间线查看。</p>
+</section>
+
+<section class="panel">
+  <h2 style="margin:0 0 14px;font-size:18px;color:var(--ink-900)">我的关键词</h2>
+  <form class="search-form" method="post" action="/monitor-keywords">
+    <label for="kw-input" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">监控关键词</label>
+    <input id="kw-input" type="text" name="keyword" placeholder="输入要监控的关键词，例如：光模块 / 固态电池 / 减持" maxlength="60">
+    <button type="submit">
+      <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
+      <span style="margin-left:6px">添加监控</span>
+    </button>
+  </form>
+  {% if keywords %}
+  <div class="tags" style="margin-top:16px">
+    {% for k in keywords %}
+    <span style="display:inline-flex;align-items:center;gap:6px">
+      <a class="tag sector" href="/monitor-keywords?kw={{ k.keyword }}">{{ k.keyword }}</a>
+      <form method="post" action="/monitor-keywords/delete" style="display:inline;margin:0">
+        <input type="hidden" name="alert_id" value="{{ k.id }}">
+        <button class="ghost" type="submit" aria-label="删除关键词 {{ k.keyword }}"
+                style="padding:5px 11px;min-height:32px;font-size:12px">删除</button>
+      </form>
+    </span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">还没有监控关键词。</div>
+  {% endif %}
+</section>
+
+{% if kw %}
+<section class="panel">
+  <div class="row-between">
+    <h2 style="margin:0;font-size:18px;color:var(--ink-900)">「{{ kw }}」命中 {{ hits|length }} 条</h2>
+    <a class="chip muted" href="/monitor-keywords">清除</a>
+  </div>
+  <div class="timeline" style="margin-top:14px">
+    {% for it in hits %}
+    <article class="item">
+      <div class="item-top">
+        <span class="src {{ it.source }}">{{ it.source_label }}</span>
+        <span class="item-time">{{ it.published_at }}</span>
+      </div>
+      {% if it.url %}
+        <a class="item-title" href="{{ it.url }}" target="_blank" rel="noreferrer">{{ it.title }}</a>
+      {% else %}
+        <div class="item-title">{{ it.title }}</div>
+      {% endif %}
+      {% if it.body and it.body != it.title %}<p class="item-body">{{ it.body[:300] }}{% if it.body|length > 300 %}…{% endif %}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

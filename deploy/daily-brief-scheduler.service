@@ -1,0 +1,27 @@
+[Unit]
+Description=daily-brief scheduler (每日快讯 · 热搜 2min / 快讯 1min 周期采集)
+Documentation=https://github.com/SuCriss/daily-brief
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/daily-brief
+
+Environment=DAILY_BRIEF_DB=/opt/daily-brief/data/brief.db
+Environment=HOT_INTERVAL=120
+Environment=NEWS_INTERVAL=60
+Environment=EXTRACT_EVERY=3
+Environment=TZ=Asia/Shanghai
+
+ExecStart=/opt/daily-brief/venv/bin/python scheduler.py
+
+Restart=always
+RestartSec=10
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}全站搜索{% endblock %}
+{% block content %}
+<section class="panel hero">
+  <h1>全站搜索</h1>
+  <p>快讯、热搜、个股、板块都可以搜。</p>
+  <form class="search-form" method="get" action="/search" role="search">
+    <label for="site-q" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">搜索关键词</label>
+    <input id="site-q" type="search" name="q" value="{{ q }}" placeholder="输入关键词" maxlength="80" autofocus>
+    <button type="submit">
+      <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+      <span style="margin-left:6px">搜索</span>
+    </button>
+  </form>
+  {% if not is_vip %}
+  <div class="notice" style="margin-top:14px">
+    当前只能查看 {{ free_delay_hours }} 小时前信息。登录会员可享受完整服务。
+  </div>
+  {% endif %}
+</section>
+
+{% if q %}
+<section class="panel">
+  <div class="chips">
+    <span class="chip">关键词 <strong>{{ q }}</strong></span>
+    <span class="chip muted">每日快讯 <strong>{{ result.brief|length }}</strong></span>
+    <span class="chip muted">全网热搜 <strong>{{ result.hot|length }}</strong></span>
+    <span class="chip muted">个股 <strong>{{ result.stocks|length }}</strong></span>
+    <span class="chip muted">板块 <strong>{{ result.sectors|length }}</strong></span>
+  </div>
+</section>
+
+{% if result.brief %}
+<section class="panel">
+  <h2 style="margin:0 0 14px;font-size:20px;color:var(--ink-900)">每日快讯</h2>
+  <div class="timeline">
+    {% for it in result.brief %}
+    <article class="item">
+      <div class="item-top">
+        <span class="src {{ it.source }}">{{ it.source_label }}</span>
+        <span class="item-time">{{ it.published_at }}</span>
+      </div>
+      {% if it.url %}
+        <a class="item-title" href="{{ it.url }}" target="_blank" rel="noreferrer">{{ it.title }}</a>
+      {% else %}
+        <div class="item-title">{{ it.title }}</div>
+      {% endif %}
+      {% if it.body and it.body != it.title %}<p class="item-body">{{ it.body[:300] }}{% if it.body|length > 300 %}…{% endif %}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if result.hot %}
+<section class="panel">
+  <h2 style="margin:0 0 14px;font-size:20px;color:var(--ink-900)">全网热搜</h2>
+  <div class="timeline">
+    {% for it in result.hot %}
+    <article class="item">
+      <div class="item-top">
+        <span class="src {{ 'weibo' if it.source=='微' else ('baidu' if it.source=='百' else 'douyin') }}">{{ it.source }}</span>
+        <span class="item-time">{{ it.captured_at }}</span>
+      </div>
+      {% if it.url %}<a class="item-title" href="{{ it.url }}" target="_blank" rel="noreferrer">{{ it.title }}</a>
+      {% else %}<div class="item-title">{{ it.title }}</div>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if result.stocks %}
+<section class="panel">
+  <h2 style="margin:0 0 14px;font-size:20px;color:var(--ink-900)">匹配个股</h2>
+  <div class="tags">
+    {% for s in result.stocks %}
+      <a class="tag" href="/stocks?code={{ s.code }}" data-kline-code="{{ s.code }}"
+         data-kline-name="{{ s.name }}" title="查看 {{ s.name }} K线">{{ s.name }} {{ s.code }}</a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if result.sectors %}
+<section class="panel">
+  <h2 style="margin:0 0 14px;font-size:20px;color:var(--ink-900)">匹配板块</h2>
+  <div class="tags">
+    {% for s in result.sectors %}<a class="tag sector" href="/sectors?name={{ s.name }}">{{ s.name }}</a>{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if not (result.brief or result.hot or result.stocks or result.sectors) %}
+<section class="panel">
+  <div class="empty">
+    <svg class="icon" aria-hidden="true" style="width:34px;height:34px;stroke:var(--ink-300);margin-bottom:10px"><use href="#i-search"/></svg>
+    <div>没有找到相关内容。可以换一个更短或更常见的关键词再试试。</div>
+  </div>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

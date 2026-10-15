@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}登录{% endblock %}
+{% block content %}
+<section class="panel" style="max-width:520px;margin:40px auto">
+  <h1 style="margin:0 0 6px;font-size:24px;color:var(--ink-900);font-weight:800">账号登录</h1>
+  <p style="margin:0 0 20px;color:var(--ink-500);font-size:14px">登录后可查看完整时间线与统计服务。勾选“长期保存登录”会保持较长时间登录状态。</p>
+  {% if error %}<div class="alert err" style="margin-bottom:16px" role="alert">用户名或密码不正确。</div>{% endif %}
+  <form class="form-stack" method="post" action="/login">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <div>
+      <label for="login-user">用户名</label>
+      <input id="login-user" type="text" name="username" required autocomplete="username">
+    </div>
+    <div>
+      <label for="login-pass">密码</label>
+      <input id="login-pass" type="password" name="password" required autocomplete="current-password">
+    </div>
+    <label for="login-remember" style="display:flex;align-items:center;gap:9px;font-weight:600;cursor:pointer;min-height:44px">
+      <input id="login-remember" type="checkbox" name="remember" value="on"
+             style="width:18px;height:18px;min-height:0;margin:0;cursor:pointer">
+      长期保存登录
+    </label>
+    <button type="submit" style="width:100%">
+      <svg class="icon" aria-hidden="true"><use href="#i-login"/></svg>
+      <span style="margin-left:6px">登录</span>
+    </button>
+  </form>
+  <p style="margin-top:18px;font-size:14px;color:var(--ink-500)">
+    还没有账号？<a href="/register" style="color:var(--brand);font-weight:700;text-decoration:none">立即注册</a>
+  </p>
+</section>
+{% endblock %}

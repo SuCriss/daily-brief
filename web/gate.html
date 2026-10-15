@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ gate_title }} - 会员可见{% endblock %}
+{% block content %}
+<section class="panel member-only-page" style="text-align:center;padding:40px 22px">
+  <span class="chip muted"><svg class="icon" aria-hidden="true" style="width:15px;height:15px"><use href="#i-shield"/></svg>会员可见</span>
+  <h1 style="margin:16px 0 10px;font-size:28px;color:var(--ink-900);font-weight:800">{{ gate_title }}</h1>
+  <p style="max-width:640px;margin:0 auto;color:var(--ink-500);font-size:14px">
+    此页面仅对会员可见。
+  </p>
+
+  <div class="gate" style="max-width:720px;margin:22px auto 0;text-align:left">
+    <h3>功能介绍</h3>
+    <p>{{ gate_desc }}</p>
+    <a class="btn-link" href="/login?next=/">
+      <svg class="icon" aria-hidden="true"><use href="#i-login"/></svg>
+      <span style="margin-left:6px">登录后继续</span>
+    </a>
+  </div>
+
+  <div style="max-width:760px;margin:28px auto 0;text-align:left">
+    <h2 style="font-size:18px;margin:0 0 12px;color:var(--ink-900)">网站所有服务</h2>
+    <div style="color:var(--ink-600);font-size:14px;line-height:2">
+      <strong style="color:var(--ink-900)">每日快讯</strong>：汇总全网异动信息，按时间线快速查看。<br>
+      <strong style="color:var(--ink-900)">股票统计</strong>：统计异动信息提及个股次数，做热度排名、趋势变化。<br>
+      <strong style="color:var(--ink-900)">板块统计</strong>：统计异动信息提及板块次数，做热度排名、趋势变化。<br>
+      <strong style="color:var(--ink-900)">自定义监控</strong>：自行设置关键词，监控全文异动。<br>
+      <strong style="color:var(--ink-900)">全网热搜</strong>：同步微博、百度、抖音热搜。<br>
+      <strong style="color:var(--ink-900)">全站搜索</strong>：快讯、热搜、个股、板块都可以搜。
+    </div>
+  </div>
+
+  <p style="margin-top:26px;color:var(--ink-400);font-size:13px">
+    访客可查看 <a href="/search" style="color:var(--brand);font-weight:700;text-decoration:none">全站搜索</a>
+    与 <a href="/news-wire" style="color:var(--brand);font-weight:700;text-decoration:none">全网热搜</a>
+    （限 {{ free_delay_hours }} 小时前的信息）。
+  </p>
+</section>
+{% endblock %}

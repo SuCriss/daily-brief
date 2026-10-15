@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}注册{% endblock %}
+{% block content %}
+<section class="panel" style="max-width:520px;margin:40px auto">
+  <h1 style="margin:0 0 6px;font-size:24px;color:var(--ink-900);font-weight:800">注册账号</h1>
+  <p style="margin:0 0 20px;color:var(--ink-500);font-size:14px">注册即可登录。第一个注册的账号自动成为管理员。</p>
+  {% if error == 'exists' %}<div class="alert err" style="margin-bottom:16px" role="alert">该用户名已存在。</div>{% endif %}
+  {% if error == 'weak' %}<div class="alert err" style="margin-bottom:16px" role="alert">用户名至少 3 位，密码至少 6 位。</div>{% endif %}
+  <form class="form-stack" method="post" action="/register">
+    <div>
+      <label for="reg-user">用户名</label>
+      <input id="reg-user" type="text" name="username" required minlength="3" maxlength="32" autocomplete="username">
+    </div>
+    <div>
+      <label for="reg-pass">密码</label>
+      <input id="reg-pass" type="password" name="password" required minlength="6" autocomplete="new-password">
+    </div>
+    <button type="submit" style="width:100%">
+      <svg class="icon" aria-hidden="true"><use href="#i-userplus"/></svg>
+      <span style="margin-left:6px">注册</span>
+    </button>
+  </form>
+  <p style="margin-top:18px;font-size:14px;color:var(--ink-500)">
+    已有账号？<a href="/login" style="color:var(--brand);font-weight:700;text-decoration:none">去登录</a>
+  </p>
+</section>
+{% endblock %}
