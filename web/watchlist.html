@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}自选{% endblock %}
+{% block content %}
+<section class="panel hero">
+  <div class="row-between">
+    <div>
+      <h1>自选</h1>
+      <p>收藏关注的个股，实时查看最新价与涨跌幅，点击名称查看 K 线。</p>
+    </div>
+    <span class="chip muted">{{ items|length }} 只</span>
+  </div>
+
+  <form class="wl-add-form" id="wl-add-form" onsubmit="return false;">
+    <label for="wl-code" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">股票代码</label>
+    <input id="wl-code" type="text" placeholder="输入股票代码，如 600519 / 300750" maxlength="16" style="flex:1 1 240px">
+    <button type="submit">加入自选</button>
+  </form>
+  <p id="wl-msg" class="muted-note" role="status" style="min-height:18px"></p>
+</section>
+
+<section class="panel">
+  {% if items %}
+  <div style="overflow:auto">
+  <table class="wl-table">
+    <caption style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">自选股列表</caption>
+    <thead>
+      <tr>
+        <th scope="col"></th><th scope="col">名称</th><th scope="col">代码</th>
+        <th scope="col">最新价</th><th scope="col">涨跌额</th><th scope="col">涨跌幅</th><th scope="col"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr data-code="{{ it.code }}">
+        <td style="width:36px">
+          <button type="button" class="star-btn on" data-wl-del="{{ it.code }}" title="移出自选" aria-label="移出自选">★</button>
+        </td>
+        <td>
+          <a class="stock-link" href="/stocks?code={{ it.code }}"
+             data-kline-code="{{ it.code }}" data-kline-name="{{ it.name }}"
+             title="查看 {{ it.name }} K线"
+             style="font-weight:600;text-decoration:none;color:var(--ink-900)">{{ it.name }}</a>
+        </td>
+        <td style="color:var(--ink-400)">{{ it.code }}</td>
+        {% if it.ok %}
+          {% set cls = 'up' if (it.change or 0) > 0 else ('down' if (it.change or 0) < 0 else '') %}
+          <td class="num" style="color:var(--ink-900)">{{ '%.2f'|format(it.price) }}</td>
+          <td class="num {{ cls }}" style="font-weight:600">{{ '%+.2f'|format(it.change) }}</td>
+          <td class="num {{ cls }}" style="font-weight:600">{{ '%+.2f%%'|format(it.pct) }}</td>
+        {% else %}
+          <td style="color:var(--ink-400)">—</td><td style="color:var(--ink-400)">—</td><td style="color:var(--ink-400)">—</td>
+        {% endif %}
+        <td style="color:var(--ink-400);font-size:12px">{{ it.created_at }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <svg class="icon" aria-hidden="true" style="width:34px;height:34px;stroke:var(--ink-300);margin-bottom:10px"><use href="#i-star"/></svg>
+    <div>还没有自选股。在上方输入股票代码加入，或在股票统计页点击个股旁的「★」收藏。</div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const $ = (s) => document.querySelector(s);
+  const msg = $('#wl-msg');
+  function showMsg(t, err){ msg.textContent = t; msg.style.color = err ? 'var(--up)' : 'var(--ink-400)'; }
+
+  // 加入自选
+  $('#wl-add-form').addEventListener('submit', async () => {
+    const code = $('#wl-code').value.trim();
+    if (!code) return;
+    try {
+      const r = await fetch('/api/watchlist', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'code=' + encodeURIComponent(code) });
+      const d = await r.json();
+      if (r.ok) { showMsg('已加入自选：' + d.name + ' ' + d.code, false); setTimeout(() => location.reload(), 600); }
+      else { showMsg('加入失败：' + (d.detail || '未知错误'), true); }
+    } catch (e) { showMsg('加入失败：' + e.message, true); }
+  });
+
+  // 移出自选
+  document.querySelectorAll('[data-wl-del]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const code = btn.dataset.wlDel;
+      try {
+        const r = await fetch('/api/watchlist/' + encodeURIComponent(code), { method:'DELETE' });
+        const d = await r.json();
+        if (r.ok && d.removed) {
+          const tr = btn.closest('tr'); if (tr) tr.remove();
+          const chip = document.querySelector('.hero .chip'); if (chip) { const n = parseInt(chip.textContent) - 1; chip.textContent = Math.max(0,n) + ' 只'; }
+          if (!document.querySelector('.wl-table tbody tr')) location.reload();
+        }
+      } catch (e) { showMsg('移除失败：' + e.message, true); }
+    });
+  });
+})();
+</script>
+{% endblock %}

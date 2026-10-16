@@ -166,17 +166,31 @@ python cli.py extract                    # 只跑抽取
 | 路由 | 说明 | 访客 |
 |---|---|---|
 | `/` | 每日快讯时间线（主页面） | 门禁页 |
-| `/stocks` | 股票统计：热度排名 + 个股异动明细 | 门禁页 |
+| `/stocks` | 股票统计：热度排名 + 个股异动明细（可加自选） | 门禁页 |
 | `/sectors` | 板块统计：热度排名 + 板块异动明细 | 门禁页 |
+| `/watchlist` | 自选：收藏个股 + 实时行情 | 需登录 |
 | `/monitor-keywords` | 自定义关键词监控 | 需登录 |
 | `/news-wire` | 全网热搜 | 开放 |
 | `/search` | 全站搜索（快讯/热搜/个股/板块） | 开放，限 3 小时前 |
 | `/api/kline` | K线数据（日/周/月/分钟，含均线与关联快讯） | 需登录 |
 | `/api/minute` | 当日分时 | 需登录 |
 | `/api/indexes` | 上证/深证/创业板指数快照 | 开放 |
+| `/api/watchlist` | 自选增删查（`POST/DELETE/GET`） | 需登录 |
+| `/api/theme` | 主题偏好持久化（`POST`） | 开放 |
 | `/api/brief` `/api/stocks` `/api/sectors` `/api/hot` `/api/stats` | JSON 接口 | 跟随分层 |
 
 分层开关：`GATE_ENABLED=0` 环境变量可让访客也直接看到全部页面（自建站点可自行决定）。
+
+### 主题设置
+
+侧栏底部提供主题切换：**跟随系统 / 深色 / 浅色**，选择经 cookie（`theme`，1 年）持久化，
+无需登录即可切换。CSS 通过 `<html data-theme>` 属性切换令牌：暗色沿用 Linear 深色画布，
+浅色采用 Linear inverse 色阶（`#f7f8f8` 画布），`system` 则随 `prefers-color-scheme` 自动切换。
+
+### 自选
+
+登录后在「股票统计」页个股旁点 ★ 收藏，或在「自选」页输入代码加入；自选列表实时展示
+最新价、涨跌额、涨跌幅（复用 K 线数据源），点击名称可看 K 线。数据按会员隔离存于 `watchlist` 表。
 
 ---
 

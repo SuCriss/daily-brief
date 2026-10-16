@@ -167,6 +167,16 @@ CREATE TABLE IF NOT EXISTS alerts (
     UNIQUE(member_id, keyword)
 );
 
+CREATE TABLE IF NOT EXISTS watchlist (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id  INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    code       TEXT NOT NULL,              -- 6 位股票代码
+    name       TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(member_id, code)
+);
+CREATE INDEX IF NOT EXISTS idx_watch_member ON watchlist(member_id);
+
 CREATE TABLE IF NOT EXISTS fetch_log (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     source     TEXT NOT NULL,
@@ -200,6 +210,40 @@ def log_fetch(source: str, status: str, count: int, message: str = "") -> None:
         "INSERT INTO fetch_log(source, status, item_count, message, ran_at) VALUES (?,?,?,?,?)",
         (source, status, count, message[:500], fmt_cst()),
     )
+
+
+# --------------------------------------------------------------------------
+# 自选（watchlist）
+# --------------------------------------------------------------------------
+def watch_add(member_id: int, code: str, name: str) -> bool:
+    """加入自选。返回是否新增（已存在返回 False）。"""
+    with tx() as conn:
+        cur = conn.execute(
+            """INSERT OR IGNORE INTO watchlist(member_id, code, name, created_at)
+               VALUES (?,?,?,?)""",
+            (member_id, code, name, fmt_cst()),
+        )
+        return cur.rowcount > 0
+
+
+def watch_remove(member_id: int, code: str) -> bool:
+    with tx() as conn:
+        cur = conn.execute("DELETE FROM watchlist WHERE member_id=? AND code=?", (member_id, code))
+        return cur.rowcount > 0
+
+
+def watch_list(member_id: int) -> list[dict]:
+    rows = get_conn().execute(
+        "SELECT code, name, created_at FROM watchlist WHERE member_id=? ORDER BY created_at DESC, id DESC",
+        (member_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def watch_codes(member_id: int) -> set[str]:
+    return {r["code"] for r in get_conn().execute(
+        "SELECT code FROM watchlist WHERE member_id=?", (member_id,)
+    ).fetchall()}
 
 
 def stats() -> dict:

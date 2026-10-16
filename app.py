@@ -14,7 +14,7 @@ from datetime import timedelta
 from typing import Optional
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from urllib.parse import urlsplit
@@ -286,10 +286,12 @@ def page_stocks(request: Request, hours: int = Query(24, ge=1, le=720), code: st
         return gate_response(request, user, "股票统计", "统计异动信息提及个股次数，做热度排名与趋势变化。")
     ranking = extract.stock_ranking(hours=hours, limit=120)
     timeline = extract.stock_timeline(code) if code else []
+    watched = db.watch_codes(user["id"]) if user else set()
     return templates.TemplateResponse(
         request,
         "stocks.html",
-        ctx(request, user, ranking=ranking, timeline=timeline, code=code, hours=hours, active="stocks"),
+        ctx(request, user, ranking=ranking, timeline=timeline, code=code, hours=hours,
+            watched=watched, active="stocks"),
     )
 
 
@@ -539,6 +541,120 @@ def api_minute(request: Request, code: str = Query(..., max_length=16)):
 def api_indexes():
     """常用指数快照。"""
     return JSONResponse(kline.market_indexes())
+
+
+# --------------------------------------------------------------------------
+# 主题设置
+# --------------------------------------------------------------------------
+@app.post("/api/theme")
+def api_set_theme(theme: str = Form(...)):
+    """持久化主题偏好（跟随系统 / 深色 / 浅色）。"""
+    if theme not in ("system", "dark", "light"):
+        raise HTTPException(400, "theme 必须是 system / dark / light")
+    resp = JSONResponse({"theme": theme})
+    resp.set_cookie("theme", theme, max_age=365 * 86400, httponly=False, samesite="lax", path="/")
+    return resp
+
+
+# --------------------------------------------------------------------------
+# 自选
+# --------------------------------------------------------------------------
+def _resolve_stock(code: str) -> tuple[str, str]:
+    """校验代码并返回 (规范代码, 名称)。"""
+    code = (code or "").strip().upper()
+    # 允许带 sh/sz/bj 前缀
+    for p in ("SH", "SZ", "BJ"):
+        if code.startswith(p) and len(code) == 8:
+            code = code[2:]
+            break
+    if not code.isdigit() or len(code) != 6:
+        raise HTTPException(400, "股票代码应为 6 位数字")
+    name = kline.stock_name(code)
+    if not name or name == code:
+        # stocks 字典里没有，尝试用 K 线源解析名称
+        try:
+            k = kline.fetch_kline(code, "day", 20)
+            name = k.get("name") or code
+        except Exception:  # noqa: BLE001
+            raise HTTPException(404, f"未找到股票 {code}") from None
+    return code, name
+
+
+def _watch_quotes(member_id: int) -> list[dict]:
+    """自选列表 + 实时行情快照。"""
+    rows = db.watch_list(member_id)
+    out = []
+    for r in rows:
+        item = {"code": r["code"], "name": r["name"], "created_at": r["created_at"],
+                "price": None, "change": None, "pct": None, "ok": False}
+        try:
+            k = kline.fetch_kline(r["code"], "day", 2, use_cache=True)
+            bars = k.get("bars") or []
+            quote = k.get("quote") or {}
+            if len(bars) >= 2:
+                last, prev = bars[-1], bars[-2]
+                item["price"] = last["close"]
+                item["change"] = round(last["close"] - prev["close"], 3)
+                item["pct"] = round((last["close"] / prev["close"] - 1) * 100, 2) if prev["close"] else 0.0
+                item["ok"] = True
+            elif quote.get("price") is not None and quote.get("prev_close"):
+                item["price"] = quote["price"]
+                item["change"] = round(quote["price"] - quote["prev_close"], 3)
+                item["pct"] = round((quote["price"] / quote["prev_close"] - 1) * 100, 2)
+                item["ok"] = True
+        except Exception:  # noqa: BLE001
+            pass
+        out.append(item)
+    return out
+
+
+@app.get("/watchlist", response_class=HTMLResponse)
+def page_watchlist(request: Request):
+    """自选股页面（需登录）。"""
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login?next=/watchlist", status_code=302)
+    items = _watch_quotes(user["id"])
+    return templates.TemplateResponse(
+        request,
+        "watchlist.html",
+        ctx(request, user, items=items, active="watchlist"),
+    )
+
+
+@app.get("/api/watchlist")
+def api_watchlist(request: Request):
+    """自选列表 + 实时行情。"""
+    user = current_user(request)
+    if not user:
+        raise HTTPException(401, "请先登录")
+    return JSONResponse(_watch_quotes(user["id"]))
+
+
+@app.post("/api/watchlist")
+def api_watch_add(request: Request, code: str = Form(...)):
+    """加入自选。"""
+    user = current_user(request)
+    if not user:
+        raise HTTPException(401, "请先登录")
+    code, name = _resolve_stock(code)
+    added = db.watch_add(user["id"], code, name)
+    return JSONResponse({"code": code, "name": name, "added": added})
+
+
+@app.delete("/api/watchlist/{code}")
+def api_watch_del(request: Request, code: str):
+    """移出自选。"""
+    user = current_user(request)
+    if not user:
+        raise HTTPException(401, "请先登录")
+    code = (code or "").strip().upper()
+    for p in ("SH", "SZ", "BJ"):
+        if code.startswith(p) and len(code) == 8:
+            code = code[2:]
+            break
+    removed = db.watch_remove(user["id"], code)
+    return JSONResponse({"code": code, "removed": removed})
 
 
 @app.get("/img")

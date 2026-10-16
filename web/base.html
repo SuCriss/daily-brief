@@ -1,11 +1,21 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="system">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#010102">
+<meta name="color-scheme" content="dark light">
 <title>{% block title %}每日快讯{% endblock %} - 每日快讯监控台</title>
+<script>
+/* 主题引导：在 CSS 生效前根据 cookie/存储确定 data-theme，避免闪烁 */
+(function(){
+  var m = document.cookie.match(/(?:^|;\s*)theme=(dark|light|system)(?:;|$)/);
+  var t = m ? m[1] : 'system';
+  if (t !== 'system') {
+    document.documentElement.setAttribute('data-theme', t);
+    document.documentElement.style.colorScheme = t;
+  }
+})();
+</script>
 <style>
 /* ==========================================================================
    设计系统 · Linear
@@ -16,9 +26,10 @@
      · 展示字重 600 负字距，正文 400；A 股语义色（红涨绿跌）保留
    ========================================================================== */
 
-/* ---------- Linear 令牌 ---------- */
+/* ---------- Linear 令牌（暗色为默认） ---------- */
 :root{
   color-scheme: dark;
+  --theme:'dark';
 
   /* 表面阶梯（Linear --color-bg-level 系） */
   --canvas:#010102;
@@ -91,6 +102,110 @@
   /* 字体：Inter（最接近 Linear 的开源替代），系统栈兜底 */
   --font-sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
   --font-mono:ui-monospace,"SF Mono",SFMono-Regular,"JetBrains Mono",Menlo,Consolas,monospace;
+}
+
+/* ---------- 浅色令牌（Linear inverse 系，深底上唯一允许的浅色面） ---------- */
+:root[data-theme="light"]{
+  color-scheme: light;
+  --theme:'light';
+
+  --canvas:#f7f8f8;
+  --surface:#ffffff;
+  --surface-2:#f5f6f6;
+  --surface-3:#ececee;
+  --surface-4:#e4e5e7;
+  --glass:rgba(255,255,255,.92);
+
+  --line:#e2e4e8;
+  --line-strong:#c8cbd1;
+  --line-tertiary:#b9bcc2;
+
+  --ink-900:#0a0c0f;
+  --ink-700:#1e232b;
+  --ink-600:#3a4149;
+  --ink-500:#5a616b;
+  --ink-400:#7a818b;
+  --ink-300:#a1a6ae;
+
+  --brand:#5e6ad2;
+  --brand-strong:#4b56b8;
+  --brand-bright:#4b56b8;
+  --brand-soft:rgba(94,106,210,.10);
+  --brand-soft-2:rgba(94,106,210,.18);
+  --brand-focus:#5e69d1;
+
+  --up:#d92d20;
+  --up-soft:rgba(217,45,32,.09);
+  --down:#067647;
+  --down-soft:rgba(6,118,71,.09);
+  --warn:#b54708;
+  --warn-soft:rgba(181,71,8,.09);
+  --danger:#b42318;
+
+  --src-weibo:#c0122b; --src-weibo-bg:rgba(192,18,43,.10);
+  --src-baidu:#1a4fd6; --src-baidu-bg:rgba(26,79,214,.10);
+  --src-douyin:#1f2937; --src-douyin-bg:rgba(31,41,55,.08);
+  --src-cls:#a51414;   --src-cls-bg:rgba(165,20,20,.10);
+  --src-em:#9b1c1c;    --src-em-bg:rgba(155,28,28,.10);
+  --src-sina:#a35a00;  --src-sina-bg:rgba(163,90,0,.12);
+
+  --sh-sm:0 1px 2px rgba(15,23,42,.06);
+  --sh-md:0 4px 14px rgba(15,23,42,.08);
+  --sh-lg:0 18px 40px rgba(15,23,42,.14);
+  --sh-xl:0 30px 70px rgba(15,23,42,.30);
+}
+
+/* 跟随系统：系统浅色时应用浅色令牌 */
+:root[data-theme="system"]{
+  color-scheme: light dark;
+  --theme:'system';
+}
+@media (prefers-color-scheme: light){
+  :root[data-theme="system"]{
+    color-scheme: light;
+    --canvas:#f7f8f8;
+    --surface:#ffffff;
+    --surface-2:#f5f6f6;
+    --surface-3:#ececee;
+    --surface-4:#e4e5e7;
+    --glass:rgba(255,255,255,.92);
+
+    --line:#e2e4e8;
+    --line-strong:#c8cbd1;
+    --line-tertiary:#b9bcc2;
+
+    --ink-900:#0a0c0f;
+    --ink-700:#1e232b;
+    --ink-600:#3a4149;
+    --ink-500:#5a616b;
+    --ink-400:#7a818b;
+    --ink-300:#a1a6ae;
+
+    --brand-strong:#4b56b8;
+    --brand-bright:#4b56b8;
+    --brand-soft:rgba(94,106,210,.10);
+    --brand-soft-2:rgba(94,106,210,.18);
+
+    --up:#d92d20;
+    --up-soft:rgba(217,45,32,.09);
+    --down:#067647;
+    --down-soft:rgba(6,118,71,.09);
+    --warn:#b54708;
+    --warn-soft:rgba(181,71,8,.09);
+    --danger:#b42318;
+
+    --src-weibo:#c0122b; --src-weibo-bg:rgba(192,18,43,.10);
+    --src-baidu:#1a4fd6; --src-baidu-bg:rgba(26,79,214,.10);
+    --src-douyin:#1f2937; --src-douyin-bg:rgba(31,41,55,.08);
+    --src-cls:#a51414;   --src-cls-bg:rgba(165,20,20,.10);
+    --src-em:#9b1c1c;    --src-em-bg:rgba(155,28,28,.10);
+    --src-sina:#a35a00;  --src-sina-bg:rgba(163,90,0,.12);
+
+    --sh-sm:0 1px 2px rgba(15,23,42,.06);
+    --sh-md:0 4px 14px rgba(15,23,42,.08);
+    --sh-lg:0 18px 40px rgba(15,23,42,.14);
+    --sh-xl:0 30px 70px rgba(15,23,42,.30);
+  }
 }
 
 /* ---------- 基础 ---------- */
@@ -367,6 +482,35 @@ footer{
   padding:12px 0 32px;line-height:1.9;
 }
 
+/* ---------- 主题切换器 ---------- */
+.theme-switch{
+  display:flex;gap:2px;margin-top:14px;padding:3px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);
+}
+.theme-opt{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:7px 4px;min-height:46px;border-radius:var(--r-sm);
+  background:transparent;color:var(--ink-500);font-size:11px;font-weight:500;
+  border:1px solid transparent;
+  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease);
+}
+.theme-opt:hover{background:var(--surface-3);color:var(--ink-900)}
+.theme-opt.on{background:var(--surface-3);color:var(--ink-900);border-color:var(--line-strong)}
+.theme-opt.on .icon{stroke:var(--brand-strong)}
+.theme-opt .icon{width:16px;height:16px}
+
+/* ---------- 自选页 ---------- */
+.wl-add-form{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.wl-table .star-btn{
+  display:inline-grid;place-items:center;width:30px;height:30px;border-radius:var(--r-sm);
+  background:var(--brand-soft);color:var(--brand-strong);border:none;cursor:pointer;
+  font-size:14px;padding:0;min-height:0;
+  transition:background var(--dur-fast) var(--ease);
+}
+.wl-table .star-btn:hover{background:var(--brand-soft-2)}
+.wl-table .star-btn.off{background:var(--surface-3);color:var(--ink-400)}
+.wl-table .star-btn.off:hover{color:var(--ink-600)}
+
 /* ==========================================================================
    K 线弹窗
    ========================================================================== */
@@ -485,6 +629,9 @@ body.kline-open{overflow:hidden}
     <symbol id="i-userplus" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8-6.1-3.5-6.1 3.5 1.4-6.8L2.2 9.1l6.9-.8z"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
   </defs>
 </svg>
 
@@ -519,6 +666,8 @@ body.kline-open{overflow:hidden}
         <svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>股票统计</a>
       <a href="/sectors" class="{{ 'active' if active=='sectors' else '' }}">
         <svg class="icon" aria-hidden="true"><use href="#i-grid"/></svg>板块统计</a>
+      <a href="/watchlist" class="{{ 'active' if active=='watchlist' else '' }}">
+        <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg>自选</a>
       <div class="sep">监控</div>
       <a href="/monitor-keywords" class="{{ 'active' if active=='monitor' else '' }}">
         <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>自定义监控</a>
@@ -536,6 +685,14 @@ body.kline-open{overflow:hidden}
           <svg class="icon" aria-hidden="true"><use href="#i-userplus"/></svg>注册</a>
       {% endif %}
     </nav>
+    <div class="theme-switch" role="group" aria-label="主题设置">
+      <button type="button" class="theme-opt" data-theme-opt="system" title="跟随系统">
+        <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>跟随系统</button>
+      <button type="button" class="theme-opt" data-theme-opt="dark" title="深色">
+        <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg>深色</button>
+      <button type="button" class="theme-opt" data-theme-opt="light" title="浅色">
+        <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg>浅色</button>
+    </div>
   </aside>
 
   <main class="main">
@@ -547,6 +704,32 @@ body.kline-open{overflow:hidden}
   </main>
 </div>
 <script src="/static/kline.js" defer></script>
+<script>
+(function(){
+  function getTheme(){ var m = document.cookie.match(/(?:^|;\s*)theme=(dark|light|system)(?:;|$)/); return m ? m[1] : 'system'; }
+  function applyTheme(t){
+    document.documentElement.setAttribute('data-theme', t);
+    if (t !== 'system') { document.documentElement.style.colorScheme = t; }
+    else { document.documentElement.style.colorScheme = 'light dark'; }
+    document.querySelectorAll('.theme-opt').forEach(function(b){ b.classList.toggle('on', b.dataset.themeOpt === t); });
+  }
+  function setTheme(t){
+    var d = new Date(); d.setFullYear(d.getFullYear() + 1);
+    document.cookie = 'theme=' + t + ';path=/;expires=' + d.toUTCString() + ';SameSite=Lax';
+    applyTheme(t);
+    try { fetch('/api/theme', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'theme=' + encodeURIComponent(t) }); } catch(e){}
+  }
+  document.querySelectorAll('.theme-opt').forEach(function(b){
+    b.addEventListener('click', function(){ setTheme(b.dataset.themeOpt); });
+  });
+  // 初始高亮
+  var cur = getTheme();
+  if (cur !== 'system') applyTheme(cur);
+  else {
+    applyTheme('system');
+  }
+})();
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

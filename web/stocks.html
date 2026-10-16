@@ -48,7 +48,7 @@
     <thead>
       <tr>
         <th scope="col">#</th><th scope="col">名称</th><th scope="col">代码</th>
-        <th scope="col">提及</th><th scope="col">上期</th><th scope="col">趋势</th><th scope="col">最近</th>
+        <th scope="col">提及</th><th scope="col">上期</th><th scope="col">趋势</th><th scope="col">最近</th><th scope="col"></th>
       </tr>
     </thead>
     <tbody>
@@ -70,6 +70,14 @@
           </span>
         </td>
         <td style="color:var(--ink-400);font-size:12px">{{ r.last_at }}</td>
+        <td style="width:36px">
+          {% if user %}
+          <button type="button" class="star-btn {{ 'on' if r.code in watched else 'off' }}"
+                  data-wl-code="{{ r.code }}" data-wl-name="{{ r.name }}"
+                  title="{{ '移出自选' if r.code in watched else '加入自选' }}"
+                  aria-label="{{ '移出自选' if r.code in watched else '加入自选' }}">★</button>
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -79,4 +87,28 @@
   <div class="empty">暂无统计数据。运行采集与抽取后再查看。</div>
   {% endif %}
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  document.querySelectorAll('[data-wl-code]').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      var code = btn.dataset.wlCode, name = btn.dataset.wlName;
+      var isOn = btn.classList.contains('on');
+      try {
+        if (isOn) {
+          var r = await fetch('/api/watchlist/' + encodeURIComponent(code), { method:'DELETE' });
+          var d = await r.json();
+          if (r.ok && d.removed) { btn.classList.remove('on'); btn.classList.add('off'); btn.title='加入自选'; btn.setAttribute('aria-label','加入自选'); }
+        } else {
+          var r2 = await fetch('/api/watchlist', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'code=' + encodeURIComponent(code) });
+          var d2 = await r2.json();
+          if (r2.ok) { btn.classList.add('on'); btn.classList.remove('off'); btn.title='移出自选'; btn.setAttribute('aria-label','移出自选'); }
+        }
+      } catch(e){}
+    });
+  });
+})();
+</script>
 {% endblock %}
